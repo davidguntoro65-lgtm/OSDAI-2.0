@@ -4,6 +4,10 @@ import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 import multer from 'multer';
 import { createHash } from 'crypto';
+import helmet from 'helmet';
+import compression from 'compression';
+import cors from 'cors';
+import rateLimit from 'express-rate-limit';
 import { StudentService, AcademicService, AiService, TeacherService, SubjectService, MajorService, TimetableService } from './src/services/enterprise';
 import { TimetableIngestionService } from './src/services/timetableIngestion';
 import { TimetableExportService } from './src/services/timetableExport';
@@ -20,6 +24,9 @@ import { createServer } from "http";
 import { Server } from "socket.io";
 import { Role } from '@prisma/client';
 import { prisma } from './src/lib/prisma';
+import { initEnv } from './src/lib/env';
+import { buildCorsOrigins, buildQrUrl, isProduction } from './src/lib/domain';
+import { logger } from './src/lib/logger';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -30,15 +37,71 @@ interface AuthRequest extends Request {
 }
 
 async function startServer() {
+  // ── Env Validation ────────────────────────────────────────
+  const appEnv = initEnv();
+  const PORT = appEnv.APP_PORT;
+
+  const corsOrigins = buildCorsOrigins();
+  const prod = isProduction();
+
+  logger.info('SERVER', `Starting OSDAI v2.0 [${appEnv.APP_ENV}] on port ${PORT}`);
+  logger.info('SERVER', `App URL: ${appEnv.APP_URL}`);
+
   const app = express();
   const httpServer = createServer(app);
-  const io = new Server(httpServer, {
-    cors: { origin: "*" }
-  });
-  
-  const PORT = process.env.PORT ? parseInt(process.env.PORT) : 5000;
 
-  app.use(express.json());
+  // ── Socket.IO — dynamic CORS ───────────────────────────────
+  const io = new Server(httpServer, {
+    cors: {
+      origin: corsOrigins.length > 0 ? corsOrigins : '*',
+      methods: ['GET', 'POST'],
+      credentials: true,
+    },
+  });
+
+  // ── Security ──────────────────────────────────────────────
+  app.set('trust proxy', 1);
+
+  app.use(helmet({
+    contentSecurityPolicy: prod ? undefined : false,
+    crossOriginEmbedderPolicy: false,
+  }));
+
+  // ── CORS — dynamic, no hardcoded domains ──────────────────
+  app.use(cors({
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+      const allowed = corsOrigins;
+      const match = allowed.some(o =>
+        typeof o === 'string' ? o === origin || o === '*'
+          : (o as RegExp).test(origin)
+      );
+      if (match || allowed.includes('*') || !prod) {
+        callback(null, true);
+      } else {
+        callback(new Error(`CORS: origin ${origin} not allowed`));
+      }
+    },
+    credentials: true,
+  }));
+
+  // ── Compression ───────────────────────────────────────────
+  app.use(compression());
+
+  // ── Rate Limiting ─────────────────────────────────────────
+  const limiter = rateLimit({
+    windowMs: appEnv.RATE_LIMIT_WINDOW_MS,
+    max: appEnv.RATE_LIMIT_MAX,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many requests. Please try again later.' },
+    skip: (req) => req.path.startsWith('/assets') || req.path.startsWith('/favicon'),
+  });
+  app.use('/api', limiter);
+
+  // ── Body Parser ───────────────────────────────────────────
+  app.use(express.json({ limit: '10mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
   // Socket.IO Events
   io.on("connection", (socket) => {
@@ -585,7 +648,7 @@ async function startServer() {
           fileUrl: '#',
           metadata: JSON.stringify({ targets: targets || [] }),
           referenceNo: refNo,
-          qrCode: `https://nexus.smk.id/verify/${refNo}`,
+          qrCode: buildQrUrl(refNo),
           uploaderId: req.user!.userId,
         }
       });
@@ -625,7 +688,7 @@ async function startServer() {
           category: category || 'SURAT_KELUAR',
           fileUrl: fileUrl?.trim() || '#',
           referenceNo: refNo,
-          qrCode: `https://nexus.smk.id/verify/${refNo}`,
+          qrCode: buildQrUrl(refNo),
           uploaderId: req.user!.userId,
         }
       });
@@ -1529,7 +1592,10 @@ async function startServer() {
   }
 
   httpServer.listen(PORT, '0.0.0.0', () => {
-    console.log(`OSDAI Server running at http://localhost:${PORT}`);
+    logger.info('SERVER', `✓ OSDAI v2.0 ready`);
+    logger.info('SERVER', `  URL    : ${appEnv.APP_URL}`);
+    logger.info('SERVER', `  Env    : ${appEnv.APP_ENV}`);
+    logger.info('SERVER', `  Port   : ${PORT}`);
   });
 }
 

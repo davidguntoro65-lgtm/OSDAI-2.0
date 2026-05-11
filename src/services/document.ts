@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma';
+import { buildQrUrl } from '../lib/domain';
 
 export const DocumentService = {
     async getArchive(category?: string) {
@@ -19,7 +20,7 @@ export const DocumentService = {
             data: {
                 ...data,
                 referenceNo: refNo,
-                qrCode: `https://nexus.smk.id/verify/${refNo}`
+                qrCode: buildQrUrl(refNo)
             }
         });
     },

@@ -1,0 +1,49 @@
+# Dependencies
+node_modules/
+.npm
+
+# Environment — NEVER commit secrets
+.env
+.env.local
+.env.development
+.env.production
+.env.*.local
+
+# Build output
+dist/
+.next/
+out/
+build/
+
+# Uploads / user data
+uploads/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Database
+*.db
+*.db-journal
+*.sqlite
+
+# Backups
+backups/
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/settings.json
+*.swp
+*.swo
+
+# Prisma generated
+prisma/generated/
+
+# Replit internal
+.local/
+.cache/
+.upm/
+.config/
+replit.nix
