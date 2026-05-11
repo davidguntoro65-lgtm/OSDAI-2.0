@@ -5,12 +5,13 @@ import { cn } from '@/lib/utils';
 interface GlassPanelProps {
   children: React.ReactNode;
   className?: string;
+  style?: React.CSSProperties;
   delay?: number;
   hoverScale?: boolean;
   onClick?: () => void;
 }
 
-export function GlassPanel({ children, className, delay = 0, hoverScale = false, onClick }: GlassPanelProps) {
+export function GlassPanel({ children, className, style, delay = 0, hoverScale = false, onClick }: GlassPanelProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20, scale: 0.98 }}
@@ -18,6 +19,7 @@ export function GlassPanel({ children, className, delay = 0, hoverScale = false,
       transition={{ duration: 0.8, delay, ease: [0.16, 1, 0.3, 1] }}
       whileHover={hoverScale ? { y: -5, scale: 1.01 } : undefined}
       onClick={onClick}
+      style={style}
       className={cn("glass-panel rounded-[40px] p-8", className)}
     >
       {children}

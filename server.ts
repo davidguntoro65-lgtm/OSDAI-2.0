@@ -1372,6 +1372,135 @@ async function startServer() {
     }
   });
 
+  // Guru: get all schedules for authenticated teacher
+  app.get('/api/timetable/guru/my-schedule', authenticate, authorize([Role.GURU, Role.SUPER_ADMIN]), async (req: AuthRequest, res) => {
+    try {
+      const teacher = await prisma.teacher.findUnique({ where: { userId: req.user!.userId } });
+      if (!teacher) return res.status(404).json({ error: 'Profil guru tidak ditemukan.' });
+      const schedules = await prisma.schedule.findMany({
+        where: { teacherId: teacher.id, deletedAt: null },
+        include: { subject: true, class: true, room: true },
+        orderBy: [{ day: 'asc' }, { periodStart: 'asc' }],
+      });
+      res.json(schedules);
+    } catch (error: any) { res.status(500).json({ error: error.message }); }
+  });
+
+  // Guru: get sessions history (for rekap)
+  app.get('/api/intelligence/sessions', authenticate, authorize([Role.GURU, Role.SUPER_ADMIN]), async (req: AuthRequest, res) => {
+    try {
+      const teacher = await prisma.teacher.findUnique({ where: { userId: req.user!.userId } });
+      if (!teacher) return res.status(404).json({ error: 'Profil guru tidak ditemukan.' });
+      const where: any = { teacherId: teacher.id };
+      if (req.query.courseId) where.courseId = req.query.courseId;
+      const sessions = await prisma.classSession.findMany({
+        where,
+        include: { class: true, subject: true, attendances: true },
+        orderBy: { startTime: 'desc' },
+        take: 100,
+      });
+      const result = sessions.map(s => ({
+        ...s,
+        hadir: s.attendances.filter(a => a.attendanceStatus === 'HADIR').length,
+        terlambat: s.attendances.filter(a => a.attendanceStatus === 'TERLAMBAT').length,
+        alfa: s.attendances.filter(a => a.attendanceStatus === 'ALFA').length,
+      }));
+      res.json(result);
+    } catch (error: any) { res.status(500).json({ error: error.message }); }
+  });
+
+  // Grades API (schema: studentId, submissionId?, value, weight, category)
+  app.post('/api/grades', authenticate, authorize([Role.GURU, Role.SUPER_ADMIN]), async (req: AuthRequest, res) => {
+    try {
+      const { studentId, value, category, weight } = req.body;
+      if (!studentId || value === undefined) return res.status(400).json({ error: 'Missing required fields.' });
+      const grade = await prisma.grade.create({
+        data: { studentId, value: parseFloat(value), category: category || 'HARIAN', weight: parseInt(weight) || 1 }
+      });
+      res.status(201).json(grade);
+    } catch (error: any) { res.status(500).json({ error: error.message }); }
+  });
+
+  app.get('/api/grades', authenticate, async (req: AuthRequest, res) => {
+    try {
+      const where: any = {};
+      if (req.query.studentId) where.studentId = req.query.studentId;
+      if (req.query.category) where.category = req.query.category;
+      const grades = await prisma.grade.findMany({ where, include: { student: { include: { user: true } } } });
+      res.json(grades);
+    } catch (error: any) { res.status(500).json({ error: error.message }); }
+  });
+
+  // Classes API (schema requires: name, grade, majorId, academicYearId)
+  app.get('/api/classes', authenticate, async (req, res) => {
+    try {
+      const classes = await prisma.class.findMany({
+        include: { major: true, academicYear: true, _count: { select: { students: true } } },
+        orderBy: [{ grade: 'asc' }, { name: 'asc' }],
+      });
+      res.json(classes);
+    } catch (error: any) { res.status(500).json({ error: error.message }); }
+  });
+
+  app.post('/api/classes', authenticate, authorize([Role.SUPER_ADMIN, Role.TU]), async (req, res) => {
+    try {
+      const { name, grade, majorId, academicYearId } = req.body;
+      if (!name?.trim() || !majorId) return res.status(400).json({ error: 'Nama kelas dan jurusan wajib diisi.' });
+      let ayId = academicYearId;
+      if (!ayId) {
+        const activeYear = await prisma.academicYear.findFirst({ where: { isActive: true } });
+        if (!activeYear) return res.status(400).json({ error: 'Tidak ada tahun ajaran aktif.' });
+        ayId = activeYear.id;
+      }
+      const cls = await prisma.class.create({ data: { name: name.trim(), grade: parseInt(grade) || 10, majorId, academicYearId: ayId } });
+      res.status(201).json(cls);
+    } catch (error: any) { res.status(500).json({ error: error.message }); }
+  });
+
+  app.patch('/api/classes/:id', authenticate, authorize([Role.SUPER_ADMIN, Role.TU]), async (req, res) => {
+    try {
+      const { name, grade, majorId } = req.body;
+      const data: any = {};
+      if (name) data.name = name;
+      if (grade) data.grade = parseInt(grade);
+      if (majorId) data.majorId = majorId;
+      const cls = await prisma.class.update({ where: { id: req.params.id }, data });
+      res.json(cls);
+    } catch (error: any) { res.status(500).json({ error: error.message }); }
+  });
+
+  app.delete('/api/classes/:id', authenticate, authorize([Role.SUPER_ADMIN, Role.TU]), async (req, res) => {
+    try {
+      await prisma.class.delete({ where: { id: req.params.id } });
+      res.json({ success: true });
+    } catch (error: any) { res.status(500).json({ error: error.message }); }
+  });
+
+  // Majors API (code is MajorCode enum: AKL, MPLB, PM, TB, TBS)
+  app.post('/api/majors', authenticate, authorize([Role.SUPER_ADMIN, Role.TU]), async (req, res) => {
+    try {
+      const { name, code, description } = req.body;
+      if (!name?.trim() || !code?.trim()) return res.status(400).json({ error: 'Nama dan kode wajib diisi.' });
+      const major = await prisma.major.create({ data: { name: name.trim(), code, description } });
+      res.status(201).json(major);
+    } catch (error: any) { res.status(500).json({ error: error.message }); }
+  });
+
+  app.patch('/api/majors/:id', authenticate, authorize([Role.SUPER_ADMIN, Role.TU]), async (req, res) => {
+    try {
+      const { name, description } = req.body;
+      const major = await prisma.major.update({ where: { id: req.params.id }, data: { name, description } });
+      res.json(major);
+    } catch (error: any) { res.status(500).json({ error: error.message }); }
+  });
+
+  app.delete('/api/majors/:id', authenticate, authorize([Role.SUPER_ADMIN, Role.TU]), async (req, res) => {
+    try {
+      await prisma.major.delete({ where: { id: req.params.id } });
+      res.json({ success: true });
+    } catch (error: any) { res.status(500).json({ error: error.message }); }
+  });
+
   // Academic Endpoints
   app.get('/api/timetable/:classId', authenticate, async (req, res) => {
     try {

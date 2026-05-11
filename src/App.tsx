@@ -3,6 +3,9 @@ import { Role } from '@prisma/client';
 import { motion, AnimatePresence, useTime, useTransform } from 'motion/react';
 import { BrainCircuit, Lock, Loader2 } from 'lucide-react';
 import ForgotPasswordScreen from '@/components/ForgotPasswordScreen';
+import ModeSelector from '@/components/enterprise/ModeSelector';
+import AdminEnterprise from '@/components/enterprise/AdminEnterprise';
+import GuruEnterprise from '@/components/enterprise/GuruEnterprise';
 
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -110,6 +113,8 @@ function toMobileTab(tab: string): MobileTab {
 
 // ── App ────────────────────────────────────────────────────────────────────────
 
+type AppMode = 'pending' | 'mobile' | 'web';
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<MobileTab>('beranda');
   const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
@@ -121,6 +126,11 @@ export default function App() {
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   // For admin beranda sub-navigation (siswa/guru modules)
   const [adminSubPage, setAdminSubPage] = useState<string | null>(null);
+  // App mode: 'pending' = show selector, 'mobile' = mobile UI, 'web' = enterprise web UI
+  const [appMode, setAppMode] = useState<AppMode>(() => {
+    const saved = localStorage.getItem('osdai_app_mode');
+    return (saved as AppMode) || 'pending';
+  });
 
   useEffect(() => {
     if (token) checkAuth();
@@ -174,8 +184,15 @@ export default function App() {
     setUser(null);
     setToken(null);
     localStorage.removeItem('token');
+    localStorage.removeItem('osdai_app_mode');
     setActiveTab('beranda');
     setAdminSubPage(null);
+    setAppMode('pending');
+  };
+
+  const handleModeSelect = (mode: 'mobile' | 'web') => {
+    localStorage.setItem('osdai_app_mode', mode);
+    setAppMode(mode);
   };
 
   const navigate = (tab: string) => {
@@ -447,7 +464,45 @@ export default function App() {
     );
   }
 
-  // ── MAIN APP ─────────────────────────────────────────────────────────────────
+  // ── MODE SELECTOR (shown after login) ────────────────────────────────────────
+
+  if (token && user && appMode === 'pending') {
+    return (
+      <ModeSelector
+        onSelectMode={handleModeSelect}
+        userName={user.name}
+        userRole={user.role}
+      />
+    );
+  }
+
+  // ── ENTERPRISE WEB MODE ───────────────────────────────────────────────────────
+
+  if (token && user && appMode === 'web') {
+    const ADMIN_ROLES_WEB = ['SUPER_ADMIN', 'TU', 'BK', 'BENDAHARA', 'KEPALA_SEKOLAH'];
+    const isAdminRole = ADMIN_ROLES_WEB.includes(user.role);
+    if (isAdminRole) {
+      return (
+        <AdminEnterprise
+          user={user}
+          authToken={token}
+          onLogout={handleLogout}
+          onSwitchMobile={() => handleModeSelect('mobile')}
+        />
+      );
+    } else {
+      return (
+        <GuruEnterprise
+          user={user}
+          authToken={token}
+          onLogout={handleLogout}
+          onSwitchMobile={() => handleModeSelect('mobile')}
+        />
+      );
+    }
+  }
+
+  // ── MAIN APP (mobile mode) ────────────────────────────────────────────────────
 
   const role = user?.role || 'GURU';
   const isGuru = role === 'GURU';

@@ -1,0 +1,509 @@
+# ROLE:
+Senior Enterprise UI Architect, Senior Fullstack Engineer, Senior UX Strategist, and SaaS Design System Specialist.
+
+# TASK:
+Build a new "MODE WEB ENTERPRISE" for OSDAI specifically for:
+- ADMIN
+- GURU
+
+The design system MUST adopt the visual philosophy, interaction flow, layout hierarchy, spacing, typography, and professional ecosystem feel inspired by Alibaba Cloud.
+
+IMPORTANT:
+DO NOT COPY ILLEGALLY.
+Instead:
+rebuild the same professional enterprise-class UX quality, cleanliness, responsiveness, and navigation structure.
+
+# PRIMARY GOAL:
+OSDAI must feel like:
+- a real enterprise SaaS platform
+- scalable
+- operational
+- modular
+- futuristic
+- clean
+- premium
+- very user friendly
+
+====================================================
+1. CRITICAL ROLE SEPARATION
+====================================================
+
+VERY IMPORTANT.
+
+ADMIN ROLE:
+----------------------------------------------------
+
+ADMIN IS NOT A PRESENSI USER.
+
+REMOVE:
+- tombol respon presensi
+- aktifkan sinyal
+- rekap absensi guru
+- fitur siswa
+
+ADMIN ONLY MANAGES:
+----------------------------------------------------
+
+✓ data master
+✓ integrasi sistem
+✓ manajemen user
+✓ audit sistem
+✓ keamanan
+✓ konfigurasi
+✓ monitoring server
+✓ pengembangan modul
+✓ manajemen jadwal
+✓ manajemen database
+✓ backup & restore
+✓ monitoring API
+✓ AI orchestration
+✓ monitoring integrasi
+
+====================================================
+2. GURU ROLE
+====================================================
+
+GURU ROLE SHOULD ONLY HAVE:
+----------------------------------------------------
+
+✓ jadwal mengajar
+✓ presensi kelas
+✓ monitoring siswa
+✓ rekap kehadiran
+✓ laporan pembelajaran
+✓ upload materi
+✓ penilaian
+✓ komunikasi kelas
+
+====================================================
+3. CREATE:
+====================================================
+
+MODE SELECTOR
+
+----------------------------------------------------
+
+[ MODE MOBILE ]
+[ MODE WEB ENTERPRISE ]
+
+====================================================
+4. WEB MODE DESIGN SYSTEM
+====================================================
+
+THEME MUST FEEL LIKE:
+----------------------------------------------------
+
+- Alibaba Cloud
+- enterprise SaaS
+- clean B2B dashboard
+- modular architecture
+- futuristic professional workspace
+
+====================================================
+5. WEB LAYOUT STRUCTURE
+====================================================
+
+----------------------------------------------------
+TOP HEADER
+----------------------------------------------------
+
+- logo OSDAI
+- search global
+- notification center
+- quick AI command
+- profile dropdown
+- system status
+
+----------------------------------------------------
+LEFT SIDEBAR
+----------------------------------------------------
+
+Collapsible professional sidebar.
+
+NOT floating childish cards.
+
+Enterprise style only.
+
+----------------------------------------------------
+CENTER CONTENT
+----------------------------------------------------
+
+Dynamic workspace system.
+
+Only active selected module visible.
+
+NO EMPTY SPACE.
+
+----------------------------------------------------
+RIGHT PANEL (OPTIONAL)
+----------------------------------------------------
+
+AI assistant panel
+Realtime monitoring
+Quick analytics
+
+====================================================
+6. TYPOGRAPHY
+====================================================
+
+USE:
+----------------------------------------------------
+
+Primary Font:
+- Inter
+- Alibaba Sans equivalent
+- Poppins fallback
+
+STYLE:
+----------------------------------------------------
+
+- clean
+- sharp
+- modern
+- readable
+- enterprise-grade
+
+====================================================
+7. COLOR SYSTEM
+====================================================
+
+PRIMARY:
+----------------------------------------------------
+
+Alibaba Orange:
+#FF6A00
+
+BACKGROUND:
+----------------------------------------------------
+
+#F5F7FA
+#FFFFFF
+#FAFAFA
+
+TEXT:
+----------------------------------------------------
+
+#111827
+#374151
+#6B7280
+
+SUCCESS:
+#10B981
+
+WARNING:
+#F59E0B
+
+ERROR:
+#EF4444
+
+====================================================
+8. UI PRINCIPLE
+====================================================
+
+DO NOT USE:
+----------------------------------------------------
+
+❌ giant glass cards
+❌ excessive blur
+❌ oversized shadows
+❌ oversized animation
+❌ childish UI
+❌ gaming style
+
+USE:
+----------------------------------------------------
+
+✓ enterprise spacing
+✓ compact modules
+✓ clean grid
+✓ operational dashboard
+✓ modular workspace
+✓ clean shadows
+✓ subtle hover animation
+
+====================================================
+9. ADMIN DASHBOARD STRUCTURE
+====================================================
+
+ADMIN DASHBOARD MUST CONTAIN:
+----------------------------------------------------
+
+TOP KPI:
+----------------------------------------------------
+
+✓ total siswa
+✓ total guru
+✓ server health
+✓ API status
+✓ storage usage
+✓ active session
+
+----------------------------------------------------
+MAIN MODULE GRID
+----------------------------------------------------
+
+✓ Manajemen Siswa
+✓ Manajemen Guru
+✓ Program Studi
+✓ Penjadwalan
+✓ AI Integrasi
+✓ Monitoring Sistem
+✓ Audit Log
+✓ Manajemen Database
+✓ Backup & Restore
+✓ Konfigurasi OSDAI
+✓ Modul Pengembangan
+✓ Monitoring API
+
+====================================================
+10. ADMIN MENU STRUCTURE
+====================================================
+
+LEFT SIDEBAR:
+----------------------------------------------------
+
+DASHBOARD
+
+MASTER DATA
+- Data Siswa
+- Data Guru
+- Program Studi
+- Mata Pelajaran
+- Kelas & Rombel
+
+AKADEMIK
+- Penjadwalan
+- Kalender Akademik
+- Sinkronisasi Jadwal
+
+SISTEM
+- Monitoring Server
+- Monitoring API
+- Queue System
+- Database Health
+- AI Engine
+
+KEAMANAN
+- Audit Log
+- Login Monitoring
+- OTP Monitoring
+- Device Monitoring
+- Permission Control
+
+ARSIP
+- Backup
+- Restore
+- Arsip Digital
+
+====================================================
+11. GURU WEB MODE
+====================================================
+
+GURU DASHBOARD:
+----------------------------------------------------
+
+TOP:
+- jadwal hari ini
+- kelas aktif
+- jumlah siswa hadir
+- tugas aktif
+
+MAIN MODULES:
+----------------------------------------------------
+
+✓ Presensi
+✓ Jadwal Mengajar
+✓ Penilaian
+✓ LMS
+✓ Materi
+✓ Rekap Kehadiran
+✓ Komunikasi Siswa
+✓ Laporan Guru
+
+====================================================
+12. SMART MODULE VIEW
+====================================================
+
+IMPORTANT:
+----------------------------------------------------
+
+ONLY ACTIVE MODULE APPEARS.
+
+Example:
+If user clicks:
+"Penjadwalan"
+
+Then:
+ONLY scheduling workspace visible.
+
+Hide unrelated widgets.
+
+====================================================
+13. WORKSPACE SYSTEM
+====================================================
+
+Build:
+----------------------------------------------------
+
+TAB-BASED WORKSPACE
+
+Example:
+----------------------------------------------------
+
+[ Data Guru ]
+[ Tambah Guru ]
+[ Import Excel ]
+[ Audit Data ]
+
+NO PAGE RELOAD.
+
+====================================================
+14. DATA TABLE SYSTEM
+====================================================
+
+MUST FEEL ENTERPRISE.
+
+Features:
+----------------------------------------------------
+
+✓ sticky header
+✓ fast search
+✓ filter
+✓ export
+✓ pagination
+✓ sorting
+✓ bulk action
+✓ inline edit
+
+====================================================
+15. ANIMATION SYSTEM
+====================================================
+
+SUBTLE ONLY.
+
+USE:
+----------------------------------------------------
+
+✓ fade transition
+✓ smooth hover
+✓ sidebar collapse animation
+✓ loading skeleton
+✓ realtime indicator
+
+DO NOT:
+----------------------------------------------------
+
+❌ excessive glowing
+❌ heavy particles
+❌ lag animation
+
+====================================================
+16. RESPONSIVE SYSTEM
+====================================================
+
+WEB MODE:
+----------------------------------------------------
+
+desktop optimized
+
+MOBILE MODE:
+----------------------------------------------------
+
+automatically switch to compact layout
+
+====================================================
+17. PERFORMANCE
+====================================================
+
+MANDATORY:
+----------------------------------------------------
+
+✓ fast rendering
+✓ lazy loading
+✓ code splitting
+✓ optimized assets
+✓ realtime without lag
+
+====================================================
+18. PROFESSIONAL ENTERPRISE COMPONENTS
+====================================================
+
+USE:
+----------------------------------------------------
+
+✓ professional modal
+✓ enterprise dropdown
+✓ clean notification center
+✓ command palette
+✓ advanced filter
+✓ activity timeline
+✓ audit timeline
+
+====================================================
+19. SYSTEM MONITORING PANEL
+====================================================
+
+ADMIN SHOULD SEE:
+----------------------------------------------------
+
+✓ online users
+✓ active guru
+✓ active kelas
+✓ queue health
+✓ failed request
+✓ API latency
+✓ websocket status
+
+====================================================
+20. FINAL QUALITY CONTROL
+====================================================
+
+VERIFY:
+----------------------------------------------------
+
+✓ no empty pages
+✓ no giant blank spaces
+✓ no broken menu
+✓ no mobile overflow
+✓ no dead button
+✓ no duplicate module
+✓ no admin attendance menu
+✓ all modules functional
+✓ enterprise feel achieved
+
+====================================================
+21. FINAL RESULT MUST FEEL LIKE
+====================================================
+
+A real enterprise cloud operating system for schools.
+
+NOT:
+a template dashboard.
+
+BUT:
+a scalable educational operating platform.
+
+====================================================
+22. FINAL EXECUTION
+====================================================
+
+Rebuild:
+- layout
+- navigation
+- module architecture
+- role separation
+- enterprise workspace
+- responsive system
+- enterprise theme
+
+using:
+- clean Alibaba Cloud inspired UX philosophy
+- Indonesian formal language
+- professional enterprise interaction
+- operational efficiency
+
+ZERO TYPESCRIPT ERROR.
+ZERO ROUTING ERROR.
+ZERO PLACEHOLDER.
+
+EXECUTE IMMEDIATELY.
