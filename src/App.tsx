@@ -277,7 +277,31 @@ export default function App() {
                 </Button>
               </form>
 
-              <p className="text-center text-[10px] font-black text-slate-400 mt-8 uppercase tracking-widest">
+              {/* Quick-fill test accounts */}
+              <div className="mt-6 pt-5 border-t border-white/20">
+                <p className="text-center text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3">Akun Test</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { label: 'Super Admin', email: 'superadmin@osdai.id', pass: 'osdai123' },
+                    { label: 'Kepala Sekolah', email: 'kepsek@smkn1wonogiri.id', pass: 'wonogiri123' },
+                    { label: 'Guru AKL', email: 'guru.akl@smkn1wonogiri.id', pass: 'guru123' },
+                    { label: 'Siswa AKL', email: 'siswa.akl1@smkn1wonogiri.id', pass: 'siswa123' },
+                  ].map(acc => (
+                    <button
+                      key={acc.email}
+                      type="button"
+                      onClick={() => { setLoginEmail(acc.email); setLoginPassword(acc.pass); }}
+                      className="text-left px-3 py-2 rounded-xl text-[9px] font-black text-slate-600 hover:text-slate-800 hover:bg-orange-50 transition-all border border-white/40"
+                      style={{ background: 'rgba(255,255,255,0.4)' }}
+                    >
+                      <p className="text-orange-500">{acc.label}</p>
+                      <p className="truncate text-slate-500">{acc.email}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <p className="text-center text-[10px] font-black text-slate-400 mt-5 uppercase tracking-widest">
                 OSDAI · SMK Negeri 1 Wonogiri
               </p>
             </CardContent>

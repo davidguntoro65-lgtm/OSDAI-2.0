@@ -3,21 +3,22 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   LayoutDashboard, Users, BarChart2, Zap, Lock,
   AlertCircle, CheckCircle2, RefreshCw, Download,
-  Sparkles, Radio, Clock, TrendingUp, Activity,
-  MapPin, Shield, ChevronRight, Bell, FileText,
-  BarChart3, Calendar,
+  Sparkles, Radio, Clock, Activity,
+  MapPin, Shield, FileText,
+  BarChart3, Calendar, Loader2,
 } from 'lucide-react';
 import { io, Socket } from 'socket.io-client';
-import { RadialBarChart, RadialBar, ResponsiveContainer, Tooltip } from 'recharts';
 
 type Screen = 'dashboard' | 'classes' | 'analytics';
 
 interface CatatanPresensi {
   id: string;
   attendanceStatus: string;
+  confirmationStatus: string;
   timestamp: string;
   integrityScore: number;
   gpsValidated: boolean;
+  sessionId: string;
   student: { user: { name: string } };
 }
 interface MetrikSesi {
@@ -31,10 +32,27 @@ interface MetrikSesi {
   attendances: CatatanPresensi[];
 }
 
+interface TodaySchedule {
+  schedule: {
+    id: string;
+    classId: string;
+    subjectId: string;
+    periodStart: number;
+    periodEnd: number;
+    class: { id: string; name: string };
+    subject: { id: string; name: string };
+  } | null;
+  currentPeriod: number;
+  day: number;
+  periodTime: string;
+}
+
 const BG = '#1C100A';
 const CARD = '#2A1708';
 const CARD2 = '#321D0E';
 const ORANGE = '#FF6A00';
+
+const DAYS_ID = ['', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
 
 function NeuralLines() {
   return (
@@ -97,12 +115,13 @@ export default function MobileGuruPresensi({ authToken, user }: { authToken: str
   const [wawasanAI, setWawasanAI] = useState<string | null>(null);
   const [menganalisis, setMenganalisis] = useState(false);
   const [error, setError] = useState('');
-  const [daftarKelas, setDaftarKelas] = useState<any[]>([]);
-  const [daftarMapel, setDaftarMapel] = useState<any[]>([]);
-  const [kelasId, setKelasId] = useState('');
-  const [mapelId, setMapelId] = useState('');
   const [mengaktifkan, setMengaktifkan] = useState(false);
   const [riskStudents, setRiskStudents] = useState<any[]>([]);
+
+  // Point 5 — auto-derived timetable state
+  const [todaySchedule, setTodaySchedule] = useState<TodaySchedule | null>(null);
+  const [loadingSchedule, setLoadingSchedule] = useState(true);
+  const [validatingIds, setValidatingIds] = useState<Set<string>>(new Set());
 
   const headers = { 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'application/json' };
   const initials = (user?.name || 'G').split(' ').slice(0, 2).map((w: string) => w[0]).join('').toUpperCase();
@@ -118,16 +137,22 @@ export default function MobileGuruPresensi({ authToken, user }: { authToken: str
     } catch { /* no-op */ }
   }, [authToken]);
 
+  // Fetch teacher's today schedule from live timetable (Point 5)
+  const ambilJadwalHariIni = useCallback(async () => {
+    setLoadingSchedule(true);
+    try {
+      const res = await fetch('/api/intelligence/today-schedule', { headers });
+      if (res.ok) setTodaySchedule(await res.json());
+    } catch { /* no-op */ }
+    finally { setLoadingSchedule(false); }
+  }, [authToken]);
+
   useEffect(() => {
     const init = async () => {
       try {
-        const [kelasRes, mapelRes, sesiRes] = await Promise.all([
-          fetch('/api/classes', { headers }),
-          fetch('/api/subjects', { headers }),
+        const [sesiRes] = await Promise.all([
           fetch('/api/intelligence/my-sessions', { headers }),
         ]);
-        if (kelasRes.ok) setDaftarKelas(await kelasRes.json());
-        if (mapelRes.ok) setDaftarMapel(await mapelRes.json());
         if (sesiRes.ok) {
           const sesi = await sesiRes.json();
           if (sesi.length > 0) { setSesiAktif(sesi[0]); ambilMetrik(sesi[0].id); }
@@ -139,6 +164,8 @@ export default function MobileGuruPresensi({ authToken, user }: { authToken: str
       } catch { /* no-op */ }
     };
     init();
+    ambilJadwalHariIni();
+
     const sock = io();
     setSocket(sock);
     return () => { sock.close(); };
@@ -148,7 +175,16 @@ export default function MobileGuruPresensi({ authToken, user }: { authToken: str
     if (sesiAktif && socket) {
       socket.emit('join-session', sesiAktif.id);
       socket.on('attendance-update', (catatan: CatatanPresensi) => {
-        setCatatanList(prev => prev.find(a => a.id === catatan.id) ? prev : [catatan, ...prev]);
+        // Point 8 — realtime badge update: replace or add record
+        setCatatanList(prev => {
+          const idx = prev.findIndex(a => a.id === catatan.id);
+          if (idx >= 0) {
+            const updated = [...prev];
+            updated[idx] = catatan;
+            return updated;
+          }
+          return [catatan, ...prev];
+        });
         ambilMetrik(sesiAktif.id);
       });
       socket.on('session-closed', () => { setSesiAktif(null); setMetrik(null); setCatatanList([]); });
@@ -156,17 +192,31 @@ export default function MobileGuruPresensi({ authToken, user }: { authToken: str
     return () => { socket?.off('attendance-update'); socket?.off('session-closed'); };
   }, [sesiAktif, socket, ambilMetrik]);
 
+  // Auto-refresh metrics every 30 seconds
+  useEffect(() => {
+    if (!sesiAktif) return;
+    const interval = setInterval(() => ambilMetrik(sesiAktif.id), 30000);
+    return () => clearInterval(interval);
+  }, [sesiAktif, ambilMetrik]);
+
+  // Point 5 — activate using auto-derived timetable (no manual picking)
   const aktifkanSinyal = async () => {
-    if (!kelasId || !mapelId) { setError('Pilih kelas dan mata pelajaran.'); return; }
+    const sched = todaySchedule?.schedule;
+    if (!sched) { setError('Tidak ada jadwal mengajar hari ini pada jam ini.'); return; }
     setError(''); setMengaktifkan(true);
     try {
       const res = await fetch('/api/intelligence/signal/activate', {
         method: 'POST', headers,
-        body: JSON.stringify({ classId: kelasId, subjectId: mapelId }),
+        body: JSON.stringify({
+          classId: sched.class.id,
+          subjectId: sched.subject.id,
+          scheduleId: sched.id,
+        }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || 'Gagal mengaktifkan sinyal.'); return; }
       setSesiAktif(data); setCatatanList([]); setMetrik(null);
+      setScreen('dashboard');
     } catch { setError('Gagal terhubung ke server.'); }
     finally { setMengaktifkan(false); }
   };
@@ -194,11 +244,23 @@ export default function MobileGuruPresensi({ authToken, user }: { authToken: str
     finally { setMenganalisis(false); }
   };
 
-  const statusColor = (s: string) => {
-    if (s === 'HADIR') return { bg: 'rgba(34,197,94,0.15)', text: 'text-green-400', dot: 'bg-green-400' };
-    if (s === 'TERLAMBAT') return { bg: 'rgba(255,106,0,0.15)', text: 'text-orange-400', dot: 'bg-orange-400' };
-    if (s === 'ALFA') return { bg: 'rgba(100,116,139,0.15)', text: 'text-slate-400', dot: 'bg-slate-400' };
-    return { bg: 'rgba(239,68,68,0.15)', text: 'text-red-400', dot: 'bg-red-400' };
+  // Point 8 — teacher manually validates a pending student's device
+  const validasiKehadiran = async (attendanceId: string) => {
+    setValidatingIds(prev => new Set(prev).add(attendanceId));
+    try {
+      await fetch(`/api/intelligence/attendance/${attendanceId}/validate`, { method: 'POST', headers });
+    } catch { /* socket will update UI */ }
+    finally {
+      setValidatingIds(prev => { const s = new Set(prev); s.delete(attendanceId); return s; });
+    }
+  };
+
+  const statusColor = (s: string, confirmStatus?: string) => {
+    if (confirmStatus === 'UNCONFIRMED' || s === 'INVALID') return { bg: 'rgba(234,179,8,0.15)', text: 'text-yellow-400', dot: 'bg-yellow-400', label: 'PENDING' };
+    if (s === 'HADIR') return { bg: 'rgba(34,197,94,0.15)', text: 'text-green-400', dot: 'bg-green-400', label: 'HADIR' };
+    if (s === 'TERLAMBAT') return { bg: 'rgba(255,106,0,0.15)', text: 'text-orange-400', dot: 'bg-orange-400', label: 'TERLAMBAT' };
+    if (s === 'ALFA') return { bg: 'rgba(100,116,139,0.15)', text: 'text-slate-400', dot: 'bg-slate-400', label: 'ALFA' };
+    return { bg: 'rgba(239,68,68,0.15)', text: 'text-red-400', dot: 'bg-red-400', label: s };
   };
 
   const engagementLevel = metrik
@@ -206,8 +268,9 @@ export default function MobileGuruPresensi({ authToken, user }: { authToken: str
     : 'N/A';
   const engagementColor = engagementLevel === 'STABLE' ? 'text-cyan-400' : engagementLevel === 'MODERATE' ? 'text-orange-400' : 'text-red-400';
 
-  // Heatmap data (mock 7x4 using catatan)
   const days = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+
+  const pendingCount = catatanList.filter(c => c.confirmationStatus === 'UNCONFIRMED' || c.attendanceStatus === 'INVALID').length;
 
   return (
     <div className="flex flex-col min-h-screen" style={{ background: BG, fontFamily: "'Poppins', sans-serif", maxWidth: 430, margin: '0 auto' }}>
@@ -259,10 +322,9 @@ export default function MobileGuruPresensi({ authToken, user }: { authToken: str
               </AnimatePresence>
 
               {sesiAktif ? (
-                /* ── ACTIVE SESSION CARD ── */
                 <>
+                  {/* ── ACTIVE SESSION CARD ── */}
                   <div className="rounded-3xl overflow-hidden relative" style={{ background: CARD, border: '1px solid rgba(255,106,0,0.2)' }}>
-                    {/* Active session badge */}
                     <div className="absolute top-4 right-4">
                       <motion.div
                         animate={{ opacity: [1, 0.5, 1] }}
@@ -274,15 +336,12 @@ export default function MobileGuruPresensi({ authToken, user }: { authToken: str
                         <span className="text-[9px] font-black text-orange-400 uppercase tracking-widest">Active Session</span>
                       </motion.div>
                     </div>
-
                     <div className="p-6 pt-14">
                       <p className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-2">Sesi Aktif</p>
                       <h2 className="text-3xl font-black text-white leading-tight mb-1">
-                        {metrik?.session.subject || sesiAktif.subjectId?.split('-')[0] || 'Mata Pelajaran'}
+                        {metrik?.session.subject || '—'}
                       </h2>
-                      <p className="text-xl font-black text-white/60">
-                        {metrik?.session.class || '—'}
-                      </p>
+                      <p className="text-xl font-black text-white/60">{metrik?.session.class || '—'}</p>
                       <div className="flex items-center gap-2 mt-2">
                         <MapPin size={12} className="text-orange-400" />
                         <p className="text-xs font-bold text-white/40">
@@ -291,24 +350,9 @@ export default function MobileGuruPresensi({ authToken, user }: { authToken: str
                       </div>
                     </div>
 
-                    {/* Donut + stats */}
                     <div className="px-6 pb-6 flex items-center gap-6">
                       <DonutChart hadir={metrik?.hadir ?? 0} total={metrik?.totalStudents ?? 0} />
                       <div className="flex-1 space-y-3">
-                        <div>
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">Signal Status</span>
-                            <span className="text-[10px] font-black text-orange-400 uppercase tracking-widest">ACTIVE</span>
-                          </div>
-                          <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
-                            <motion.div
-                              animate={{ x: ['-100%', '200%'] }}
-                              transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-                              className="h-full w-1/3 rounded-full"
-                              style={{ background: `linear-gradient(90deg, transparent, ${ORANGE}, transparent)` }}
-                            />
-                          </div>
-                        </div>
                         <div>
                           <div className="flex items-center justify-between mb-1">
                             <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">Engagement</span>
@@ -339,16 +383,27 @@ export default function MobileGuruPresensi({ authToken, user }: { authToken: str
                             />
                           </div>
                         </div>
+                        {/* Point 8 — pending validation badge */}
+                        {pendingCount > 0 && (
+                          <motion.div
+                            animate={{ opacity: [0.7, 1, 0.7] }}
+                            transition={{ duration: 1.5, repeat: Infinity }}
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl"
+                            style={{ background: 'rgba(234,179,8,0.15)', border: '1px solid rgba(234,179,8,0.3)' }}
+                          >
+                            <div className="w-1.5 h-1.5 rounded-full bg-yellow-400" />
+                            <span className="text-[10px] font-black text-yellow-400">{pendingCount} Perlu Validasi</span>
+                          </motion.div>
+                        )}
                       </div>
                     </div>
 
-                    {/* Quick stats row */}
                     <div className="grid grid-cols-4 border-t" style={{ borderColor: 'rgba(255,106,0,0.15)' }}>
                       {[
                         { label: 'Hadir', val: metrik?.hadir ?? 0, color: 'text-green-400' },
                         { label: 'Terlambat', val: metrik?.terlambat ?? 0, color: 'text-orange-400' },
                         { label: 'Alfa', val: metrik?.alfa ?? 0, color: 'text-red-400' },
-                        { label: 'Invalid', val: metrik?.invalid ?? 0, color: 'text-slate-400' },
+                        { label: 'Pending', val: pendingCount, color: 'text-yellow-400' },
                       ].map((s, i) => (
                         <div key={i} className="py-4 text-center" style={i < 3 ? { borderRight: '1px solid rgba(255,106,0,0.1)' } : {}}>
                           <p className={`text-xl font-black ${s.color}`}>{s.val}</p>
@@ -386,19 +441,33 @@ export default function MobileGuruPresensi({ authToken, user }: { authToken: str
                     )}
                   </div>
 
-                  {/* Live confirmations */}
+                  {/* Live confirmations — Point 8: shows PENDING badge + validate button */}
                   <div className="rounded-3xl overflow-hidden" style={{ background: CARD }}>
                     <div className="px-5 pt-5 pb-3 flex items-center justify-between">
                       <p className="text-sm font-black text-white">Konfirmasi Langsung</p>
-                      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background: 'rgba(34,197,94,0.15)' }}>
-                        <motion.div animate={{ opacity: [1, 0.3, 1] }} transition={{ duration: 1.2, repeat: Infinity }} className="w-1.5 h-1.5 rounded-full bg-green-400" />
-                        <span className="text-[10px] font-black text-green-400">{catatanList.filter(a => a.attendanceStatus !== 'ALFA').length} LIVE</span>
+                      <div className="flex items-center gap-2">
+                        {pendingCount > 0 && (
+                          <motion.div
+                            animate={{ opacity: [1, 0.4, 1] }}
+                            transition={{ duration: 1.2, repeat: Infinity }}
+                            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full"
+                            style={{ background: 'rgba(234,179,8,0.15)' }}
+                          >
+                            <div className="w-1.5 h-1.5 rounded-full bg-yellow-400" />
+                            <span className="text-[10px] font-black text-yellow-400">{pendingCount} PENDING</span>
+                          </motion.div>
+                        )}
+                        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background: 'rgba(34,197,94,0.15)' }}>
+                          <motion.div animate={{ opacity: [1, 0.3, 1] }} transition={{ duration: 1.2, repeat: Infinity }} className="w-1.5 h-1.5 rounded-full bg-green-400" />
+                          <span className="text-[10px] font-black text-green-400">{catatanList.filter(a => a.attendanceStatus !== 'ALFA').length} LIVE</span>
+                        </div>
                       </div>
                     </div>
-                    <div className="max-h-56 overflow-y-auto">
+                    <div className="max-h-72 overflow-y-auto">
                       <AnimatePresence>
-                        {catatanList.slice(0, 8).map((c, i) => {
-                          const sc = statusColor(c.attendanceStatus);
+                        {catatanList.slice(0, 10).map((c, i) => {
+                          const sc = statusColor(c.attendanceStatus, c.confirmationStatus);
+                          const isPending = c.confirmationStatus === 'UNCONFIRMED' || c.attendanceStatus === 'INVALID';
                           return (
                             <motion.div
                               key={c.id}
@@ -408,7 +477,7 @@ export default function MobileGuruPresensi({ authToken, user }: { authToken: str
                               className="flex items-center gap-3 px-5 py-3 border-t"
                               style={{ borderColor: 'rgba(255,255,255,0.04)' }}
                             >
-                              <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-black text-sm"
+                              <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-black text-sm shrink-0"
                                 style={{ background: 'rgba(255,106,0,0.2)' }}>
                                 {c.student.user.name.charAt(0)}
                               </div>
@@ -419,9 +488,26 @@ export default function MobileGuruPresensi({ authToken, user }: { authToken: str
                                   {c.gpsValidated && <span className="text-green-400 ml-1">✓ GPS</span>}
                                 </p>
                               </div>
-                              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg" style={{ background: sc.bg }}>
-                                <div className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} />
-                                <span className={`text-[10px] font-black ${sc.text}`}>{c.attendanceStatus}</span>
+                              <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg" style={{ background: sc.bg }}>
+                                  <motion.div
+                                    className={`w-1.5 h-1.5 rounded-full ${sc.dot}`}
+                                    animate={isPending ? { opacity: [1, 0.3, 1] } : {}}
+                                    transition={{ duration: 1, repeat: Infinity }}
+                                  />
+                                  <span className={`text-[10px] font-black ${sc.text}`}>{sc.label}</span>
+                                </div>
+                                {/* Point 8 — validate button for pending students */}
+                                {isPending && (
+                                  <button
+                                    onClick={() => validasiKehadiran(c.id)}
+                                    disabled={validatingIds.has(c.id)}
+                                    className="px-2 py-1 rounded-lg text-[9px] font-black transition-all disabled:opacity-40"
+                                    style={{ background: 'rgba(34,197,94,0.2)', border: '1px solid rgba(34,197,94,0.3)', color: '#4ade80' }}
+                                  >
+                                    {validatingIds.has(c.id) ? <Loader2 size={10} className="animate-spin" /> : '✓'}
+                                  </button>
+                                )}
                               </div>
                             </motion.div>
                           );
@@ -436,7 +522,6 @@ export default function MobileGuruPresensi({ authToken, user }: { authToken: str
                     </div>
                   </div>
 
-                  {/* Close signal */}
                   <button
                     onClick={tutupSinyal}
                     className="w-full py-4 rounded-2xl font-black text-white transition-all hover:opacity-90"
@@ -460,7 +545,7 @@ export default function MobileGuruPresensi({ authToken, user }: { authToken: str
                     <Radio size={36} className="text-orange-500/50" />
                   </motion.div>
                   <h3 className="text-xl font-black text-white mb-1">Tidak Ada Sesi Aktif</h3>
-                  <p className="text-sm font-bold text-white/30 mb-5">Aktifkan sinyal presensi dari tab Kelas untuk memulai.</p>
+                  <p className="text-sm font-bold text-white/30 mb-5">Aktifkan sinyal presensi dari tab Kelas.</p>
                   <button
                     onClick={() => setScreen('classes')}
                     className="mx-auto flex items-center gap-2 px-5 py-3 rounded-xl font-black text-sm text-orange-400"
@@ -473,87 +558,96 @@ export default function MobileGuruPresensi({ authToken, user }: { authToken: str
             </motion.div>
           )}
 
-          {/* ── CLASSES TAB ── */}
+          {/* ── CLASSES TAB — Point 5: auto-derive from timetable ── */}
           {screen === 'classes' && (
             <motion.div key="classes" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} className="px-4 pb-28 space-y-4">
 
-              {/* Session Management Header */}
+              {/* Today's Schedule Card (auto-derived) */}
               <div className="rounded-3xl overflow-hidden" style={{ background: CARD }}>
                 <div className="p-5" style={{ background: 'linear-gradient(135deg, rgba(255,106,0,0.15), rgba(50,29,14,0))' }}>
                   <div className="flex items-center gap-2 mb-2">
                     <Radio size={14} className="text-orange-400" />
-                    <span className="text-[10px] font-black text-orange-400 uppercase tracking-widest">Session Management</span>
+                    <span className="text-[10px] font-black text-orange-400 uppercase tracking-widest">Jadwal Otomatis dari Sistem</span>
                   </div>
-                  <h2 className="text-2xl font-black text-white">Current Schedule<br />Validation</h2>
+                  <h2 className="text-2xl font-black text-white">Jadwal Mengajar<br />Hari Ini</h2>
                 </div>
-                <div className="px-5 pb-5 space-y-3">
-                  <div className="flex items-center gap-3 py-3 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
-                    <Calendar size={14} className="text-orange-400 shrink-0" />
-                    <div>
-                      <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">Date & Time</p>
-                      <p className="text-sm font-black text-white">
-                        {new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })} · {new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+
+                {loadingSchedule ? (
+                  <div className="px-5 pb-5 pt-2 flex items-center gap-3">
+                    <Loader2 size={16} className="text-orange-400 animate-spin" />
+                    <p className="text-sm font-bold text-white/40">Memeriksa jadwal dari database...</p>
+                  </div>
+                ) : todaySchedule?.schedule ? (
+                  <div className="px-5 pb-5 space-y-3">
+                    <div className="flex items-center gap-3 py-3 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+                      <Calendar size={14} className="text-orange-400 shrink-0" />
+                      <div>
+                        <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">Hari & Waktu</p>
+                        <p className="text-sm font-black text-white">
+                          {DAYS_ID[todaySchedule.day]} · {todaySchedule.periodTime} (JP {todaySchedule.schedule.periodStart}–{todaySchedule.schedule.periodEnd})
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 py-3 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+                      <Users size={14} className="text-orange-400 shrink-0" />
+                      <div>
+                        <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">Kelas</p>
+                        <p className="text-sm font-black text-white">{todaySchedule.schedule.class.name}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 py-3 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+                      <BarChart3 size={14} className="text-orange-400 shrink-0" />
+                      <div>
+                        <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">Mata Pelajaran</p>
+                        <p className="text-sm font-black" style={{ color: '#06b6d4' }}>{todaySchedule.schedule.subject.name}</p>
+                      </div>
+                    </div>
+                    {/* Auto-derive badge */}
+                    <div className="flex items-center gap-2 px-3 py-2 rounded-xl" style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)' }}>
+                      <CheckCircle2 size={12} className="text-green-400 shrink-0" />
+                      <p className="text-[10px] font-black text-green-400">Kelas & mata pelajaran otomatis dari jadwal timetable</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="px-5 pb-5 pt-3">
+                    <div className="flex items-center gap-2 p-3 rounded-xl" style={{ background: 'rgba(255,106,0,0.1)', border: '1px solid rgba(255,106,0,0.2)' }}>
+                      <AlertCircle size={14} className="text-orange-400 shrink-0" />
+                      <p className="text-xs font-bold text-orange-300">
+                        Tidak ada jadwal mengajar hari ini. Hubungi TU untuk mengatur jadwal pada modul Timetable.
                       </p>
                     </div>
+                    <button
+                      onClick={ambilJadwalHariIni}
+                      className="mt-3 w-full flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-black text-white/40 hover:text-white/60 transition-colors"
+                    >
+                      <RefreshCw size={12} /> Muat Ulang Jadwal
+                    </button>
                   </div>
-                  <div className="flex items-center gap-3 py-3 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
-                    <Users size={14} className="text-orange-400 shrink-0" />
-                    <div>
-                      <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">Classroom</p>
-                      <p className="text-sm font-black text-white">{sesiAktif ? metrik?.session.class : 'Pilih kelas di bawah'}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 py-3 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
-                    <BarChart3 size={14} className="text-orange-400 shrink-0" />
-                    <div>
-                      <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">Subject Module</p>
-                      <p className="text-sm font-black" style={{ color: '#06b6d4' }}>{sesiAktif ? metrik?.session.subject : 'Pilih mata pelajaran di bawah'}</p>
-                    </div>
-                  </div>
-                </div>
+                )}
               </div>
 
-              {/* Activate / Close Signal */}
+              {/* Active session info or activate button */}
               {!sesiAktif ? (
                 <div className="space-y-3">
-                  <div>
-                    <label className="block text-[10px] font-black text-white/40 uppercase tracking-widest mb-1.5">Pilih Kelas</label>
-                    <select
-                      value={kelasId}
-                      onChange={e => setKelasId(e.target.value)}
-                      className="w-full rounded-2xl px-4 py-3.5 font-black text-sm text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
-                      style={{ background: CARD, border: '1px solid rgba(255,106,0,0.2)', color: 'white' }}
-                    >
-                      <option value="" style={{ background: CARD }}>— Pilih Kelas —</option>
-                      {daftarKelas.map((c: any) => <option key={c.id} value={c.id} style={{ background: CARD }}>{c.name}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-black text-white/40 uppercase tracking-widest mb-1.5">Mata Pelajaran</label>
-                    <select
-                      value={mapelId}
-                      onChange={e => setMapelId(e.target.value)}
-                      className="w-full rounded-2xl px-4 py-3.5 font-black text-sm text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
-                      style={{ background: CARD, border: '1px solid rgba(255,106,0,0.2)', color: 'white' }}
-                    >
-                      <option value="" style={{ background: CARD }}>— Pilih Mata Pelajaran —</option>
-                      {daftarMapel.map((s: any) => <option key={s.id} value={s.id} style={{ background: CARD }}>{s.name}</option>)}
-                    </select>
-                  </div>
                   {error && (
                     <p className="text-xs font-bold text-red-400 px-1">{error}</p>
                   )}
                   <button
                     onClick={aktifkanSinyal}
-                    disabled={mengaktifkan}
+                    disabled={mengaktifkan || !todaySchedule?.schedule || loadingSchedule}
                     className="w-full py-5 rounded-2xl font-black text-white text-base disabled:opacity-50 transition-all hover:opacity-90"
                     style={{ background: `linear-gradient(135deg, ${ORANGE}, #c44e00)`, boxShadow: `0 8px 30px rgba(255,106,0,0.4)` }}
                   >
                     <div className="flex items-center justify-center gap-2">
-                      <Zap size={18} />
-                      {mengaktifkan ? 'MENGAKTIFKAN...' : 'AKTIFKAN SINYAL'}
+                      {mengaktifkan ? <Loader2 size={18} className="animate-spin" /> : <Zap size={18} />}
+                      {mengaktifkan ? 'MENGAKTIFKAN...' : todaySchedule?.schedule ? 'AKTIFKAN SINYAL PRESENSI' : 'TIDAK ADA JADWAL HARI INI'}
                     </div>
                   </button>
+                  {todaySchedule?.schedule && (
+                    <p className="text-center text-[10px] font-black text-white/20 uppercase tracking-widest">
+                      Sinyal akan otomatis terikat ke jadwal timetable
+                    </p>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -637,21 +731,6 @@ export default function MobileGuruPresensi({ authToken, user }: { authToken: str
                     />
                   </div>
                 </div>
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-sm font-black text-white">Dropout Pattern</span>
-                    <span className="text-sm font-black text-green-400">Low Risk</span>
-                  </div>
-                  <div className="h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: '18%' }}
-                      transition={{ duration: 1, ease: 'easeOut' }}
-                      className="h-full rounded-full"
-                      style={{ background: 'linear-gradient(90deg, #16a34a, #4ade80)' }}
-                    />
-                  </div>
-                </div>
                 <div className="pt-2 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
                   <p className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-1">Stability Score</p>
                   <div className="flex items-baseline gap-1">
@@ -683,7 +762,7 @@ export default function MobileGuruPresensi({ authToken, user }: { authToken: str
                   </div>
                 </div>
                 <div className="p-3 space-y-2">
-                  {riskStudents.length > 0 ? riskStudents.slice(0, 3).map((s, i) => (
+                  {riskStudents.length > 0 ? riskStudents.slice(0, 3).map((s) => (
                     <div key={s.id} className="flex items-center gap-3 p-3 rounded-2xl" style={{ background: CARD2 }}>
                       <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-600 to-orange-800 flex items-center justify-center text-white font-black text-sm shrink-0">
                         {s.name?.charAt(0) || 'S'}
@@ -694,12 +773,9 @@ export default function MobileGuruPresensi({ authToken, user }: { authToken: str
                           {s.status} · Kehadiran {Math.round(s.attendanceRate)}%
                         </p>
                       </div>
-                      <button
-                        className="px-3 py-2 rounded-xl text-[10px] font-black text-orange-400 shrink-0"
-                        style={{ background: 'rgba(255,106,0,0.15)', border: '1px solid rgba(255,106,0,0.25)' }}
-                      >
-                        {s.riskScore > 60 ? 'Notify Parent' : 'View Profile'}
-                      </button>
+                      <span className="px-3 py-2 rounded-xl text-[10px] font-black text-orange-400" style={{ background: 'rgba(255,106,0,0.15)', border: '1px solid rgba(255,106,0,0.25)' }}>
+                        {s.riskScore > 60 ? 'Urgent' : 'Monitor'}
+                      </span>
                     </div>
                   )) : (
                     <div className="py-8 text-center">
@@ -708,10 +784,9 @@ export default function MobileGuruPresensi({ authToken, user }: { authToken: str
                     </div>
                   )}
                 </div>
-                {/* Export buttons */}
                 <div className="p-4 space-y-2 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
                   <button
-                    className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl font-black text-sm text-white transition-all hover:opacity-90"
+                    className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl font-black text-sm transition-all hover:opacity-90"
                     style={{ background: 'rgba(255,106,0,0.15)', border: '1px solid rgba(255,106,0,0.25)' }}
                     onClick={() => sesiAktif && window.open(`/api/intelligence/session/${sesiAktif.id}/metrics`, '_blank')}
                   >
@@ -719,7 +794,7 @@ export default function MobileGuruPresensi({ authToken, user }: { authToken: str
                     <span className="text-orange-300">Download PDF Report</span>
                   </button>
                   <button
-                    className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl font-black text-sm text-white transition-all hover:opacity-90"
+                    className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl font-black text-sm transition-all hover:opacity-90"
                     style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
                   >
                     <Download size={14} className="text-white/40" />
@@ -727,6 +802,24 @@ export default function MobileGuruPresensi({ authToken, user }: { authToken: str
                   </button>
                 </div>
               </div>
+
+              {/* Today's schedule summary in analytics */}
+              {todaySchedule && (
+                <div className="rounded-2xl p-4" style={{ background: CARD }}>
+                  <div className="flex items-center gap-2 mb-3">
+                    <Clock size={14} className="text-orange-400" />
+                    <p className="text-[10px] font-black text-orange-400 uppercase tracking-widest">Jadwal Hari Ini</p>
+                  </div>
+                  {todaySchedule.schedule ? (
+                    <div className="space-y-1">
+                      <p className="text-sm font-black text-white">{todaySchedule.schedule.subject.name}</p>
+                      <p className="text-xs font-bold text-white/40">{todaySchedule.schedule.class.name} · JP {todaySchedule.schedule.periodStart}–{todaySchedule.schedule.periodEnd} · {todaySchedule.periodTime}</p>
+                    </div>
+                  ) : (
+                    <p className="text-xs font-bold text-white/30">Tidak ada jadwal hari ini</p>
+                  )}
+                </div>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
@@ -741,12 +834,18 @@ export default function MobileGuruPresensi({ authToken, user }: { authToken: str
             { id: 'analytics', label: 'Analitik', icon: BarChart2 },
           ].map(tab => {
             const active = screen === tab.id;
+            const tabId = tab.id as Screen;
             return (
               <button
                 key={tab.id}
-                onClick={() => setScreen(tab.id as Screen)}
-                className="flex-1 flex flex-col items-center gap-1 py-4 transition-all"
+                onClick={() => setScreen(tabId)}
+                className="flex-1 flex flex-col items-center gap-1 py-4 transition-all relative"
               >
+                {tab.id === 'dashboard' && pendingCount > 0 && sesiAktif && (
+                  <div className="absolute top-2 right-[30%] w-4 h-4 rounded-full bg-yellow-400 flex items-center justify-center">
+                    <span className="text-[8px] font-black text-black">{pendingCount}</span>
+                  </div>
+                )}
                 <div className="p-2 rounded-xl transition-all" style={active ? { background: 'rgba(255,106,0,0.2)' } : {}}>
                   <tab.icon size={20} className={active ? 'text-orange-400' : 'text-white/25'} />
                 </div>

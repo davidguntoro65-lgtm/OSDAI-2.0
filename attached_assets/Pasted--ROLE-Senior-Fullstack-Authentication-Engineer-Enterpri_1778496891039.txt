@@ -1,0 +1,257 @@
+# ROLE:
+Senior Fullstack Authentication Engineer & Enterprise Access Control Architect.
+
+# TASK:
+Build and test a complete multi-role authentication and role-routing system for OSDAI (Otomatisasi Sekolah Digital Berbasis Artificial Intelligent).
+
+# MANDATE:
+Production Ready.
+Zero Login Error.
+Zero Routing Conflict.
+All Login Buttons Functional.
+All Roles Directed to Correct Dashboard.
+Professional Indonesian UI.
+No Placeholder.
+Real Database Authentication.
+
+====================================================
+1. AUTHENTICATION SYSTEM
+====================================================
+
+Build full authentication system using:
+- PostgreSQL
+- Prisma ORM
+- JWT Session
+- bcrypt password hashing
+
+Implement:
+- Login
+- Logout
+- Session persistence
+- Role-based access
+- Protected routes
+- Middleware validation
+
+====================================================
+2. USER ROLES
+====================================================
+
+Create these official roles:
+
+1. SUPER_ADMIN
+2. ADMIN
+3. KEPALA_SEKOLAH
+4. GURU
+5. SISWA
+
+====================================================
+3. LOGIN FLOW
+====================================================
+
+When user clicks LOGIN:
+- validate username/password
+- check role
+- generate session token
+- redirect automatically to role dashboard
+
+====================================================
+4. ROLE ROUTING
+====================================================
+
+ROUTING MUST BE STRICT.
+
+SUPER_ADMIN:
+→ /dashboard/super-admin
+
+ADMIN:
+→ /dashboard/admin
+
+KEPALA_SEKOLAH:
+→ /dashboard/kepala-sekolah
+
+GURU:
+→ /dashboard/guru
+
+SISWA:
+→ /dashboard/siswa
+
+====================================================
+5. TEST USERS (MANDATORY)
+====================================================
+
+Create permanent testing accounts.
+
+----------------------------------------------------
+SUPER ADMIN
+----------------------------------------------------
+Username:
+superadmin_osdai
+
+Password:
+osdai123
+
+----------------------------------------------------
+ADMIN
+----------------------------------------------------
+Username:
+admin_osdai
+
+Password:
+osdai123
+
+----------------------------------------------------
+KEPALA SEKOLAH
+----------------------------------------------------
+Username:
+kepsek_wonogiri
+
+Password:
+wonogiri123
+
+Nama:
+Drs. Kepala Sekolah SMKN 1 Wonogiri
+
+----------------------------------------------------
+GURU
+----------------------------------------------------
+Username:
+guru_akl
+
+Password:
+guru123
+
+Nama:
+Budi Santoso, S.Pd
+
+Mapel:
+Akuntansi Dasar
+
+----------------------------------------------------
+SISWA
+----------------------------------------------------
+Username:
+siswa_akl1
+
+Password:
+siswa123
+
+Nama:
+Andi Pratama
+
+Kelas:
+X AKL 1
+
+====================================================
+6. DATABASE STRUCTURE
+====================================================
+
+Create User table:
+
+id
+username
+passwordHash
+role
+fullName
+isActive
+createdAt
+updatedAt
+
+Create relation:
+- GuruProfile
+- StudentProfile
+- KepalaSekolahProfile
+
+====================================================
+7. LOGIN PAGE UI
+====================================================
+
+Theme:
+OSDAI AI FUTURE GLASSMORPHISM.
+
+Requirements:
+- Full responsive
+- Animated AI neural background
+- Indonesian formal language
+- Floating glass login panel
+- Professional orange accent (#FF6A00)
+- No empty spaces
+- Fast loading
+
+Login form:
+- Username
+- Password
+- Tombol Masuk Sistem
+
+Show:
+- loading animation
+- invalid credential alert
+- session expired alert
+
+====================================================
+8. SECURITY VALIDATION
+====================================================
+
+Prevent:
+- unauthorized route access
+- direct URL bypass
+- session hijacking
+- invalid JWT access
+
+If unauthorized:
+redirect to /login
+
+====================================================
+9. DASHBOARD TEST
+====================================================
+
+After login:
+each role dashboard MUST show different modules.
+
+----------------------------------------------------
+KEPALA SEKOLAH
+----------------------------------------------------
+- Monitoring Presensi
+- Monitoring Guru
+- Statistik Sekolah
+- Audit Kehadiran
+- Kelas Aktif
+
+----------------------------------------------------
+GURU
+----------------------------------------------------
+- Jadwal Mengajar
+- Aktifkan Sinyal Presensi
+- Rekap Kehadiran
+- Download Laporan
+
+----------------------------------------------------
+SISWA
+----------------------------------------------------
+- Jadwal Hari Ini
+- Respon Presensi
+- Status Kehadiran
+- Riwayat Presensi
+
+====================================================
+10. FINAL TESTING
+====================================================
+
+Perform complete testing:
+- login success
+- wrong password
+- route redirect
+- logout
+- session persistence
+- role access
+- middleware protection
+
+Verify:
+- no typescript errors
+- no prisma errors
+- no infinite loading
+- no broken routes
+- no blank dashboard
+
+All login buttons MUST work properly.
+
+Execute immediately.

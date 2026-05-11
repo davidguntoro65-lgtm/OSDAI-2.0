@@ -949,6 +949,125 @@ async function startServer() {
     }
   });
 
+  // GET today's schedule for authenticated teacher — auto-derives class+subject from live timetable
+  app.get('/api/intelligence/today-schedule', authenticate, authorize([Role.GURU, Role.SUPER_ADMIN]), async (req: AuthRequest, res) => {
+    try {
+      const teacher = await prisma.teacher.findUnique({ where: { userId: req.user!.userId } });
+      if (!teacher) return res.status(404).json({ error: 'Profil guru tidak ditemukan.' });
+
+      const now = new Date();
+      // JS getDay(): 0=Sun,1=Mon...6=Sat → DB day: 1=Mon...7=Sun
+      const jsDay = now.getDay();
+      const dbDay = jsDay === 0 ? 7 : jsDay;
+
+      // Derive current period from TimetableConfig or defaults
+      const config = await prisma.timetableConfig.findFirst();
+      const startAt = config?.startAt || '07:00';
+      const periodDuration = config?.periodDuration || 45;
+      const [startH, startM] = startAt.split(':').map(Number);
+      const startMinutes = startH * 60 + startM;
+      const nowMinutes = now.getHours() * 60 + now.getMinutes();
+      const currentPeriod = Math.max(1, Math.floor((nowMinutes - startMinutes) / periodDuration) + 1);
+
+      // Find schedule active RIGHT NOW (periodStart <= current <= periodEnd)
+      let schedule = await prisma.schedule.findFirst({
+        where: {
+          teacherId: teacher.id,
+          day: dbDay,
+          periodStart: { lte: currentPeriod },
+          periodEnd: { gte: currentPeriod },
+          deletedAt: null,
+        },
+        include: { class: true, subject: true },
+      });
+
+      // Fall back to next upcoming period today
+      if (!schedule) {
+        schedule = await prisma.schedule.findFirst({
+          where: {
+            teacherId: teacher.id,
+            day: dbDay,
+            periodStart: { gt: currentPeriod },
+            deletedAt: null,
+          },
+          include: { class: true, subject: true },
+          orderBy: { periodStart: 'asc' },
+        });
+      }
+
+      // Compute period start time string for display
+      const periodStartMin = startMinutes + ((schedule?.periodStart ?? currentPeriod) - 1) * periodDuration;
+      const ph = Math.floor(periodStartMin / 60).toString().padStart(2, '0');
+      const pm = (periodStartMin % 60).toString().padStart(2, '0');
+
+      res.json({ schedule, currentPeriod, day: dbDay, periodTime: `${ph}:${pm}` });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // TEACHER validates a PENDING student's attendance (Point 8 — realtime badge update)
+  app.post('/api/intelligence/attendance/:id/validate', authenticate, authorize([Role.GURU, Role.SUPER_ADMIN]), async (req: AuthRequest, res) => {
+    try {
+      const updated = await prisma.studentAttendance.update({
+        where: { id: req.params.id },
+        data: {
+          confirmationStatus: 'CONFIRMED',
+          attendanceStatus: 'HADIR',
+          integrityScore: 0.7,
+        },
+        include: { student: { include: { user: true } } },
+      });
+      // Broadcast to the session room so teacher dashboard badge updates in real-time
+      io.to(`session-${updated.sessionId}`).emit('attendance-update', updated);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // SEED test accounts — idempotent, safe to call multiple times
+  app.post('/api/seed', async (_req, res) => {
+    try {
+      const accounts = [
+        { email: 'superadmin@osdai.id',         password: 'osdai123',    role: Role.SUPER_ADMIN,    name: 'Super Admin OSDAI' },
+        { email: 'admin@osdai.id',               password: 'osdai123',    role: Role.TU,             name: 'Admin Tata Usaha OSDAI' },
+        { email: 'kepsek@smkn1wonogiri.id',      password: 'wonogiri123', role: Role.KEPALA_SEKOLAH, name: 'Drs. Kepala Sekolah SMKN 1 Wonogiri' },
+        { email: 'guru.akl@smkn1wonogiri.id',    password: 'guru123',     role: Role.GURU,           name: 'Budi Santoso, S.Pd' },
+        { email: 'siswa.akl1@smkn1wonogiri.id',  password: 'siswa123',    role: Role.SISWA,          name: 'Andi Pratama' },
+        { email: 'bendahara@smkn1wonogiri.id',   password: 'osdai123',    role: Role.BENDAHARA,      name: 'Bendahara SMKN 1 Wonogiri' },
+        { email: 'bk@smkn1wonogiri.id',          password: 'osdai123',    role: Role.BK,             name: 'Guru BK SMKN 1 Wonogiri' },
+      ];
+      const results: any[] = [];
+      for (const acc of accounts) {
+        const existing = await prisma.user.findUnique({ where: { email: acc.email } });
+        if (existing) { results.push({ status: 'EXISTS', email: acc.email, role: acc.role }); continue; }
+        const { AuthService } = await import('./src/services/auth.js');
+        const hashed = await AuthService.hashPassword(acc.password);
+        const user = await prisma.user.create({ data: { email: acc.email, password: hashed, role: acc.role, name: acc.name } });
+        // Create linked profiles
+        if (acc.role === Role.GURU) {
+          await prisma.teacher.upsert({
+            where: { userId: user.id },
+            update: {},
+            create: { userId: user.id, nuptk: `NUPTK-${Date.now()}`, status: 'ACTIVE', department: 'Akuntansi', specialization: 'Akuntansi Dasar' },
+          });
+        }
+        if (acc.role === Role.SISWA) {
+          await prisma.student.upsert({
+            where: { userId: user.id },
+            update: {},
+            create: { userId: user.id, nis: `NIS${Date.now()}`, nisn: `NISN${Date.now()}`, status: 'ACTIVE' },
+          });
+        }
+        results.push({ status: 'CREATED', email: acc.email, role: acc.role });
+      }
+      res.json({ results });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.get('/api/intelligence/session/:sessionId/metrics', authenticate, async (req, res) => {
     try {
       const metrics = await IntelligenceService.getSessionMetrics(req.params.sessionId);

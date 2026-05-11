@@ -3,13 +3,13 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   LayoutDashboard, Users, BarChart2, MapPin, Shield,
   Smartphone, RefreshCw, CheckCircle2, AlertCircle,
-  Clock, Radio, Fingerprint, WifiOff, Wifi, Lock,
-  BookOpen, Star, TrendingUp, Calendar, ChevronRight,
+  Radio, Fingerprint, Wifi, Lock,
+  BookOpen, Clock,
 } from 'lucide-react';
 import { io } from 'socket.io-client';
 
 type Screen = 'dashboard' | 'classes' | 'analytics';
-type AttendanceStatus = 'IDLE' | 'SEARCHING' | 'FOUND' | 'LOCATING' | 'SUBMITTING' | 'CONFIRMED' | 'ALREADY_CONFIRMED' | 'ERROR';
+type AttendanceStatus = 'IDLE' | 'SEARCHING' | 'FOUND' | 'LOCATING' | 'SUBMITTING' | 'CONFIRMED' | 'ALREADY_CONFIRMED' | 'PENDING_DEVICE' | 'ERROR';
 
 interface ActiveSession {
   id: string;
@@ -29,7 +29,6 @@ interface HistoryItem {
 
 const BG = '#1C100A';
 const CARD = '#2A1708';
-const CARD2 = '#321D0E';
 const ORANGE = '#FF6A00';
 
 function PulseRing({ active }: { active: boolean }) {
@@ -42,6 +41,22 @@ function PulseRing({ active }: { active: boolean }) {
           initial={{ width: 160, height: 160, opacity: 0.7 }}
           animate={{ width: 260, height: 260, opacity: 0 }}
           transition={{ duration: 2.4, repeat: Infinity, delay: i * 0.8, ease: 'easeOut' }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function PulseRingYellow({ active }: { active: boolean }) {
+  return (
+    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+      {active && [0, 1, 2].map(i => (
+        <motion.div
+          key={i}
+          className="absolute rounded-full border-2 border-yellow-500/40"
+          initial={{ width: 160, height: 160, opacity: 0.7 }}
+          animate={{ width: 260, height: 260, opacity: 0 }}
+          transition={{ duration: 2.8, repeat: Infinity, delay: i * 0.9, ease: 'easeOut' }}
         />
       ))}
     </div>
@@ -76,7 +91,6 @@ export default function MobileStudentPresensi({
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [loadingSession, setLoadingSession] = useState(true);
   const [gpsStatus, setGpsStatus] = useState<'IDLE' | 'VALIDATING' | 'VALID' | 'INVALID'>('IDLE');
-  const [deviceStatus] = useState<'VERIFIED'>('VERIFIED');
 
   const headers = { 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'application/json' };
 
@@ -90,7 +104,7 @@ export default function MobileStudentPresensi({
         setStatus(prev => prev === 'IDLE' ? 'FOUND' : prev);
       } else {
         setActiveSession(null);
-        setStatus(prev => (prev !== 'CONFIRMED' && prev !== 'ALREADY_CONFIRMED') ? 'IDLE' : prev);
+        setStatus(prev => (prev !== 'CONFIRMED' && prev !== 'ALREADY_CONFIRMED' && prev !== 'PENDING_DEVICE') ? 'IDLE' : prev);
       }
     } catch { /* no-op */ }
     finally { setLoadingSession(false); }
@@ -110,7 +124,15 @@ export default function MobileStudentPresensi({
     socket.on('session-opened', () => fetchActiveSession());
     socket.on('session-closed', () => {
       setActiveSession(null);
-      if (status !== 'CONFIRMED' && status !== 'ALREADY_CONFIRMED') setStatus('IDLE');
+      if (status !== 'CONFIRMED' && status !== 'ALREADY_CONFIRMED' && status !== 'PENDING_DEVICE') setStatus('IDLE');
+    });
+    // Point 8 — if teacher validates pending attendance, update status to CONFIRMED
+    socket.on('attendance-update', (data: any) => {
+      if (data?.confirmationStatus === 'CONFIRMED' && status === 'PENDING_DEVICE') {
+        setStatus('CONFIRMED');
+        setAttendanceResult(data);
+        fetchHistory();
+      }
     });
     return () => { socket.close(); };
   }, []);
@@ -142,9 +164,21 @@ export default function MobileStudentPresensi({
           });
           const data = await res.json();
           if (!res.ok) { setStatus('ERROR'); setGpsStatus('INVALID'); setErrorMsg(data.error || 'Gagal konfirmasi kehadiran.'); return; }
-          if (data.status === 'SUCCESS' || data.status === 'ALREADY_CONFIRMED') {
+
+          if (data.status === 'ALREADY_CONFIRMED') {
             setAttendanceResult(data.attendance);
-            setStatus(data.status === 'ALREADY_CONFIRMED' ? 'ALREADY_CONFIRMED' : 'CONFIRMED');
+            setStatus('ALREADY_CONFIRMED');
+            fetchHistory();
+          } else if (data.status === 'SUCCESS') {
+            setAttendanceResult(data.attendance);
+            // Point 2 — if GPS invalid (confirmationStatus UNCONFIRMED) → PENDING_DEVICE
+            if (data.attendance?.confirmationStatus === 'UNCONFIRMED') {
+              setStatus('PENDING_DEVICE');
+              setGpsStatus('INVALID');
+            } else {
+              setStatus('CONFIRMED');
+              setGpsStatus('VALID');
+            }
             fetchHistory();
           } else {
             setStatus('ERROR'); setGpsStatus('INVALID'); setErrorMsg(data.error || 'Terjadi kesalahan.');
@@ -156,7 +190,10 @@ export default function MobileStudentPresensi({
     );
   };
 
-  const reset = () => { setStatus(activeSession ? 'FOUND' : 'IDLE'); setErrorMsg(''); setSessionToken(''); setAttendanceResult(null); setGpsStatus('IDLE'); };
+  const reset = () => {
+    setStatus(activeSession ? 'FOUND' : 'IDLE');
+    setErrorMsg(''); setSessionToken(''); setAttendanceResult(null); setGpsStatus('IDLE');
+  };
 
   const initials = (user?.name || 'S').split(' ').slice(0, 2).map((w: string) => w[0]).join('').toUpperCase();
   const today = new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long' });
@@ -165,6 +202,7 @@ export default function MobileStudentPresensi({
     if (s === 'HADIR') return { label: 'Hadir', cls: 'bg-green-500/20 text-green-400' };
     if (s === 'TERLAMBAT') return { label: 'Terlambat', cls: 'bg-orange-500/20 text-orange-400' };
     if (s === 'ALFA') return { label: 'Alfa', cls: 'bg-slate-500/20 text-slate-400' };
+    if (s === 'INVALID') return { label: 'Pending', cls: 'bg-yellow-500/20 text-yellow-400' };
     return { label: s, cls: 'bg-red-500/20 text-red-400' };
   };
 
@@ -201,7 +239,6 @@ export default function MobileStudentPresensi({
         <AnimatePresence mode="wait">
           {screen === 'dashboard' && (
             <motion.div key="dash" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} className="px-4 pb-28 space-y-4">
-              {/* Title */}
               <div className="text-center pt-4 pb-2">
                 <h1 className="text-4xl font-black text-white tracking-tight">Presensi Digital</h1>
                 <p className="text-sm font-bold text-white/50 mt-1">Sistem berbasis AI untuk validasi<br />kehadiran real-time.</p>
@@ -210,6 +247,7 @@ export default function MobileStudentPresensi({
               {/* Main Signal Button */}
               <div className="relative flex items-center justify-center py-8">
                 <PulseRing active={status === 'LOCATING' || status === 'SUBMITTING'} />
+                <PulseRingYellow active={status === 'PENDING_DEVICE'} />
                 <AnimatePresence mode="wait">
                   {status === 'CONFIRMED' || status === 'ALREADY_CONFIRMED' ? (
                     <motion.button
@@ -225,6 +263,27 @@ export default function MobileStudentPresensi({
                         {attendanceResult?.attendanceStatus === 'HADIR' ? 'HADIR' : attendanceResult?.attendanceStatus}
                       </span>
                     </motion.button>
+
+                  ) : status === 'PENDING_DEVICE' ? (
+                    /* Point 2 — PENDING_DEVICE waiting state */
+                    <motion.button
+                      key="pending"
+                      initial={{ scale: 0.8, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      className="relative w-44 h-44 rounded-full flex flex-col items-center justify-center gap-2 cursor-default"
+                      style={{ background: 'radial-gradient(circle at 40% 40%, #713f12, #451a03)', boxShadow: '0 0 60px rgba(234,179,8,0.35), inset 0 1px 0 rgba(255,255,255,0.1)' }}
+                    >
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
+                      >
+                        <Radio size={48} className="text-yellow-300" />
+                      </motion.div>
+                      <span className="text-[10px] font-black text-yellow-300 uppercase tracking-widest text-center leading-tight">
+                        Menunggu<br />Validasi
+                      </span>
+                    </motion.button>
+
                   ) : status === 'ERROR' ? (
                     <motion.button
                       key="error"
@@ -237,6 +296,7 @@ export default function MobileStudentPresensi({
                       <AlertCircle size={48} className="text-red-300" />
                       <span className="text-[10px] font-black text-red-300 uppercase tracking-widest">Coba Lagi</span>
                     </motion.button>
+
                   ) : (
                     <motion.button
                       key="signal"
@@ -263,7 +323,7 @@ export default function MobileStudentPresensi({
                           {status === 'LOCATING' ? 'Mencari GPS...' : status === 'SUBMITTING' ? 'Mengirim...' : 'Respon Sinyal'}
                         </p>
                         <p className="text-[10px] font-bold text-white/50 uppercase tracking-widest mt-0.5">
-                          {status === 'FOUND' ? 'KETUK UNTUK HADIR' : loadingSession ? 'MEMERIKSA...' : 'READY'}
+                          {status === 'FOUND' ? 'KETUK UNTUK HADIR' : loadingSession ? 'MEMERIKSA...' : 'STANDBY'}
                         </p>
                       </div>
                     </motion.button>
@@ -271,9 +331,60 @@ export default function MobileStudentPresensi({
                 </AnimatePresence>
               </div>
 
+              {/* Point 2 — PENDING_DEVICE detailed info card */}
+              <AnimatePresence>
+                {status === 'PENDING_DEVICE' && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="rounded-2xl p-5 space-y-3"
+                    style={{ background: 'rgba(113,63,18,0.4)', border: '1px solid rgba(234,179,8,0.3)' }}
+                  >
+                    <div className="flex items-center gap-2">
+                      <motion.div
+                        animate={{ opacity: [1, 0.3, 1] }}
+                        transition={{ duration: 1.5, repeat: Infinity }}
+                        className="w-2 h-2 rounded-full bg-yellow-400"
+                      />
+                      <p className="text-xs font-black text-yellow-400 uppercase tracking-widest">Validasi Perangkat Tertunda</p>
+                    </div>
+                    <p className="text-sm font-bold text-white/70 leading-relaxed">
+                      Kehadiran Anda telah tercatat, namun posisi GPS Anda berada di luar zona sekolah. Guru perlu memvalidasi kehadiran Anda secara manual.
+                    </p>
+                    <div className="grid grid-cols-2 gap-2 pt-1">
+                      <div className="rounded-xl p-3 text-center" style={{ background: 'rgba(255,255,255,0.05)' }}>
+                        <p className="text-[9px] font-black text-white/30 uppercase tracking-widest mb-1">Status</p>
+                        <p className="text-sm font-black text-yellow-400">PENDING</p>
+                      </div>
+                      <div className="rounded-xl p-3 text-center" style={{ background: 'rgba(255,255,255,0.05)' }}>
+                        <p className="text-[9px] font-black text-white/30 uppercase tracking-widest mb-1">Waktu</p>
+                        <p className="text-sm font-black text-white">
+                          {attendanceResult?.timestamp ? new Date(attendanceResult.timestamp).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '—'}
+                        </p>
+                      </div>
+                    </div>
+                    <motion.div
+                      animate={{ opacity: [0.6, 1, 0.6] }}
+                      transition={{ duration: 2, repeat: Infinity }}
+                      className="flex items-center justify-center gap-2 pt-1"
+                    >
+                      <Clock size={12} className="text-yellow-400/60" />
+                      <p className="text-[10px] font-black text-yellow-400/60 uppercase tracking-widest">Menunggu konfirmasi guru...</p>
+                    </motion.div>
+                    <button
+                      onClick={reset}
+                      className="w-full text-xs font-black text-white/20 hover:text-white/40 uppercase tracking-widest py-1 transition-colors"
+                    >
+                      ↩ Reset
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
               {/* Session info / token input */}
               <AnimatePresence>
-                {activeSession && status !== 'CONFIRMED' && status !== 'ALREADY_CONFIRMED' && (
+                {activeSession && status !== 'CONFIRMED' && status !== 'ALREADY_CONFIRMED' && status !== 'PENDING_DEVICE' && (
                   <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -316,8 +427,8 @@ export default function MobileStudentPresensi({
                 )}
               </AnimatePresence>
 
-              {/* Searching indicator (no active session) */}
-              {!activeSession && !loadingSession && status !== 'CONFIRMED' && status !== 'ALREADY_CONFIRMED' && (
+              {/* Searching indicator */}
+              {!activeSession && !loadingSession && status !== 'CONFIRMED' && status !== 'ALREADY_CONFIRMED' && status !== 'PENDING_DEVICE' && (
                 <motion.div
                   animate={{ opacity: [0.5, 1, 0.5] }}
                   transition={{ duration: 2, repeat: Infinity }}
@@ -347,7 +458,7 @@ export default function MobileStudentPresensi({
                     </div>
                     <div className="rounded-2xl p-4 text-center" style={{ background: CARD }}>
                       <p className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-1">Status</p>
-                      <p className="text-lg font-black text-green-400">{attendanceResult?.attendanceStatus || '—'}</p>
+                      <p className="text-lg font-black text-green-400">{attendanceResult?.attendanceStatus || 'HADIR'}</p>
                     </div>
                   </div>
                   <button onClick={reset} className="w-full text-xs font-black text-white/30 hover:text-white/50 uppercase tracking-widest py-2 transition-colors">
@@ -365,11 +476,16 @@ export default function MobileStudentPresensi({
                   <div className="flex-1">
                     <p className="text-[10px] font-black text-orange-400 uppercase tracking-widest">Validasi Geospasial</p>
                     <p className="text-sm font-black text-white">
-                      {gpsStatus === 'VALIDATING' ? 'VALIDATING GPS & DEVICE...' : gpsStatus === 'VALID' ? 'GPS VALIDATED ✓' : gpsStatus === 'INVALID' ? 'GPS INVALID ✗' : 'VALIDATING GPS & DEVICE...'}
+                      {gpsStatus === 'VALIDATING' ? 'VALIDATING GPS...'
+                        : gpsStatus === 'VALID' ? 'GPS VALIDATED ✓'
+                        : gpsStatus === 'INVALID' ? 'GPS DI LUAR ZONA ✗'
+                        : 'STANDBY'}
                     </p>
                   </div>
                   <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(255,106,0,0.1)' }}>
-                    {gpsStatus === 'VALID' ? <Shield size={18} className="text-green-400" /> : <Shield size={18} className="text-orange-400/50" />}
+                    {gpsStatus === 'VALID' ? <Shield size={18} className="text-green-400" />
+                      : gpsStatus === 'INVALID' ? <Shield size={18} className="text-yellow-400" />
+                      : <Shield size={18} className="text-orange-400/50" />}
                   </div>
                 </div>
                 <div className="h-px" style={{ background: 'rgba(255,106,0,0.1)' }} />
@@ -379,11 +495,26 @@ export default function MobileStudentPresensi({
                   </div>
                   <div className="flex-1">
                     <p className="text-[10px] font-black text-orange-400 uppercase tracking-widest">Device Fingerprint</p>
-                    <p className="text-sm font-black text-white">{deviceStatus}</p>
+                    <p className="text-sm font-black text-white">
+                      {status === 'PENDING_DEVICE' ? 'PENDING VALIDATION' : 'VERIFIED'}
+                    </p>
                   </div>
-                  <Shield size={18} className="text-green-400" />
+                  {status === 'PENDING_DEVICE'
+                    ? <motion.div animate={{ opacity: [1, 0.3, 1] }} transition={{ duration: 1.2, repeat: Infinity }}>
+                        <Shield size={18} className="text-yellow-400" />
+                      </motion.div>
+                    : <Shield size={18} className="text-green-400" />
+                  }
                 </div>
               </div>
+
+              {/* Lock icon if no active session and not confirmed */}
+              {!activeSession && !loadingSession && status === 'IDLE' && (
+                <div className="flex flex-col items-center gap-2 py-4">
+                  <Lock size={24} className="text-orange-900/60" />
+                  <p className="text-xs font-bold text-white/20 text-center">Belum ada sesi presensi aktif dari guru.</p>
+                </div>
+              )}
             </motion.div>
           )}
 
@@ -394,7 +525,7 @@ export default function MobileStudentPresensi({
               {history.length === 0 ? (
                 <div className="rounded-3xl p-10 text-center" style={{ background: CARD }}>
                   <BookOpen size={40} className="text-orange-900 mx-auto mb-4" />
-                  <p className="text-sm font-black text-white/40">Belum ada data jadwal</p>
+                  <p className="text-sm font-black text-white/40">Belum ada riwayat kehadiran</p>
                 </div>
               ) : (
                 history.slice(0, 6).map((item, i) => {
@@ -426,11 +557,11 @@ export default function MobileStudentPresensi({
           {screen === 'analytics' && (
             <motion.div key="analytics" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} className="px-4 pb-28 pt-4 space-y-4">
               <h2 className="text-2xl font-black text-white">Rekap Presensi</h2>
-              {/* Stats */}
               {(() => {
                 const hadir = history.filter(h => h.attendanceStatus === 'HADIR').length;
                 const terlambat = history.filter(h => h.attendanceStatus === 'TERLAMBAT').length;
                 const alfa = history.filter(h => h.attendanceStatus === 'ALFA').length;
+                const pending = history.filter(h => h.attendanceStatus === 'INVALID').length;
                 const total = history.length;
                 const rate = total > 0 ? Math.round((hadir / total) * 100) : 0;
                 return (
@@ -448,6 +579,12 @@ export default function MobileStudentPresensi({
                         </div>
                       ))}
                     </div>
+                    {pending > 0 && (
+                      <div className="rounded-2xl p-4" style={{ background: 'rgba(113,63,18,0.3)', border: '1px solid rgba(234,179,8,0.2)' }}>
+                        <p className="text-[9px] font-black text-yellow-400/60 uppercase tracking-widest mb-1">Validasi Tertunda</p>
+                        <p className="text-3xl font-black text-yellow-400">{pending}</p>
+                      </div>
+                    )}
                     <div className="rounded-2xl p-5" style={{ background: CARD }}>
                       <div className="flex items-center justify-between mb-3">
                         <p className="text-sm font-black text-white">Tingkat Kehadiran</p>
@@ -466,7 +603,6 @@ export default function MobileStudentPresensi({
                         {rate >= 75 ? '✓ Memenuhi batas minimum kehadiran' : '⚠ Di bawah batas minimum 75%'}
                       </p>
                     </div>
-                    {/* Heatmap-style weekly */}
                     <div className="rounded-2xl p-5" style={{ background: CARD }}>
                       <p className="text-[10px] font-black text-orange-400 uppercase tracking-widest mb-3">Kehadiran Mingguan</p>
                       <div className="grid grid-cols-7 gap-1.5">
@@ -476,7 +612,11 @@ export default function MobileStudentPresensi({
                             {[...Array(4)].map((_, j) => {
                               const idx = i * 4 + j;
                               const h = history[idx];
-                              const col = !h ? 'rgba(255,255,255,0.05)' : h.attendanceStatus === 'HADIR' ? 'rgba(34,197,94,0.6)' : h.attendanceStatus === 'TERLAMBAT' ? 'rgba(255,106,0,0.6)' : 'rgba(239,68,68,0.4)';
+                              const col = !h ? 'rgba(255,255,255,0.05)'
+                                : h.attendanceStatus === 'HADIR' ? 'rgba(34,197,94,0.6)'
+                                : h.attendanceStatus === 'TERLAMBAT' ? 'rgba(255,106,0,0.6)'
+                                : h.attendanceStatus === 'INVALID' ? 'rgba(234,179,8,0.5)'
+                                : 'rgba(239,68,68,0.4)';
                               return <div key={j} className="w-full aspect-square rounded-sm mb-1" style={{ background: col }} />;
                             })}
                           </div>
@@ -504,9 +644,16 @@ export default function MobileStudentPresensi({
               <button
                 key={tab.id}
                 onClick={() => setScreen(tab.id as Screen)}
-                className="flex-1 flex flex-col items-center gap-1 py-4 transition-all"
+                className="flex-1 flex flex-col items-center gap-1 py-4 transition-all relative"
               >
-                <div className={`p-2 rounded-xl transition-all ${active ? '' : ''}`} style={active ? { background: 'rgba(255,106,0,0.2)' } : {}}>
+                {tab.id === 'dashboard' && status === 'PENDING_DEVICE' && (
+                  <motion.div
+                    animate={{ opacity: [1, 0.3, 1] }}
+                    transition={{ duration: 1.2, repeat: Infinity }}
+                    className="absolute top-2 right-[30%] w-3 h-3 rounded-full bg-yellow-400"
+                  />
+                )}
+                <div className={`p-2 rounded-xl transition-all`} style={active ? { background: 'rgba(255,106,0,0.2)' } : {}}>
                   <tab.icon size={20} className={active ? 'text-orange-400' : 'text-white/30'} />
                 </div>
                 <span className={`text-[10px] font-black uppercase tracking-widest ${active ? 'text-orange-400' : 'text-white/30'}`}>{tab.label}</span>
