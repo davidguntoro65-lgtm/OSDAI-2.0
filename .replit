@@ -42,3 +42,9 @@ externalPort = 3000
 deploymentTarget = "autoscale"
 run = ["node", "--import", "tsx/esm", "server.ts"]
 build = ["npx", "prisma", "generate"]
+
+[userenv]
+
+[userenv.shared]
+JWT_SECRET = "94edb82ae775afe96d4fdf65880ccd9817587d7b3cdc6ccc972e8aabd1bded9b80760e9c9c08b15e67d65cbc8ccbf112"
+REFRESH_SECRET = "00aa2228979aef99e5a5c331f73b239f6f9d11e5c5aa47c61d148d5cbaddf365f4822b689300f3f53813b78f6bf2b35c"

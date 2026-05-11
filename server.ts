@@ -846,45 +846,97 @@ async function startServer() {
   });
 
   // --- Intelligence Endpoints ---
+
+  // ACTIVATE signal — teacher identity always from JWT, never from body
   app.post('/api/intelligence/signal/activate', authenticate, authorize([Role.SUPER_ADMIN, Role.GURU]), async (req: AuthRequest, res) => {
     try {
       const teacher = await prisma.teacher.findUnique({ where: { userId: req.user!.userId } });
-      if (!teacher) return res.status(404).json({ error: 'Teacher not found' });
-      
+      if (!teacher) return res.status(404).json({ error: 'Profil guru tidak ditemukan.' });
       const session = await IntelligenceService.activateSignal(
-        teacher.id, 
-        req.body.classId, 
-        req.body.subjectId, 
+        teacher.id,
+        req.body.classId,
+        req.body.subjectId,
         req.body.scheduleId
       );
       res.json(session);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(400).json({ error: error.message });
     }
   });
 
-  app.post('/api/intelligence/signal/close', authenticate, authorize([Role.SUPER_ADMIN, Role.GURU]), async (req, res) => {
+  // CLOSE signal — only the owning teacher can close; auto-marks absent as ALFA
+  app.post('/api/intelligence/signal/close', authenticate, authorize([Role.SUPER_ADMIN, Role.GURU]), async (req: AuthRequest, res) => {
     try {
-      const session = await IntelligenceService.closeSignal(req.body.sessionId);
+      const teacher = await prisma.teacher.findUnique({ where: { userId: req.user!.userId } });
+      if (!teacher) return res.status(404).json({ error: 'Profil guru tidak ditemukan.' });
+      const session = await IntelligenceService.closeSignal(req.body.sessionId, teacher.id);
+      // Notify all clients in the session room that it is now closed
+      io.to(`session-${req.body.sessionId}`).emit('session-closed', { sessionId: req.body.sessionId });
+      res.json(session);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // STUDENT RESPOND — validates session token + class membership + GPS + duplicate
+  app.post('/api/intelligence/respond', authenticate, authorize([Role.SISWA]), async (req: AuthRequest, res) => {
+    try {
+      const student = await prisma.student.findUnique({ where: { userId: req.user!.userId } });
+      if (!student) return res.status(404).json({ error: 'Profil siswa tidak ditemukan.' });
+      if (!req.body.sessionToken) return res.status(400).json({ error: 'Token sesi wajib diisi.' });
+
+      const result = await IntelligenceService.respondToSignal(
+        student.id,
+        req.user!.userId,
+        req.body.sessionId,
+        req.body
+      );
+
+      if (result.status === 'SUCCESS') {
+        io.to(`session-${req.body.sessionId}`).emit('attendance-update', result.attendance);
+      }
+      res.json(result);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // GET active session for the authenticated student's class
+  app.get('/api/intelligence/active-session', authenticate, authorize([Role.SISWA]), async (req: AuthRequest, res) => {
+    try {
+      const student = await prisma.student.findUnique({ where: { userId: req.user!.userId } });
+      if (!student) return res.status(404).json({ error: 'Profil siswa tidak ditemukan.' });
+      const session = await IntelligenceService.getActiveSessionForStudent(student.id);
+      if (!session) return res.status(204).end();
       res.json(session);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });
 
-  app.post('/api/intelligence/respond', authenticate, authorize([Role.SISWA]), async (req: AuthRequest, res) => {
+  // GET student's own attendance history
+  app.get('/api/intelligence/my-history', authenticate, authorize([Role.SISWA]), async (req: AuthRequest, res) => {
     try {
       const student = await prisma.student.findUnique({ where: { userId: req.user!.userId } });
-      if (!student) return res.status(404).json({ error: 'Student not found' });
-      
-      const result = await IntelligenceService.respondToSignal(student.id, req.body.sessionId, req.body);
-      
-      // Emit realtime update to teacher's room
-      if (result.status === 'SUCCESS') {
-        io.to(`session-${req.body.sessionId}`).emit('attendance-update', result.attendance);
-      }
-      
-      res.json(result);
+      if (!student) return res.status(404).json({ error: 'Profil siswa tidak ditemukan.' });
+      const history = await IntelligenceService.getStudentHistory(student.id, 20);
+      res.json(history);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // GET active sessions for the current GURU (so teacher can resume a session)
+  app.get('/api/intelligence/my-sessions', authenticate, authorize([Role.GURU, Role.SUPER_ADMIN]), async (req: AuthRequest, res) => {
+    try {
+      const teacher = await prisma.teacher.findUnique({ where: { userId: req.user!.userId } });
+      if (!teacher) return res.status(404).json({ error: 'Profil guru tidak ditemukan.' });
+      const sessions = await prisma.classSession.findMany({
+        where: { teacherId: teacher.id, signalStatus: 'ACTIVE' },
+        include: { class: true, subject: true },
+        orderBy: { startTime: 'desc' }
+      });
+      res.json(sessions);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

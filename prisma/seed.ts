@@ -38,6 +38,20 @@ async function main() {
   }
   const majorRecords = await prisma.major.findMany();
 
+  // 2b. Subjects
+  const subjectData = [
+    { code: 'MTK', name: 'Matematika', type: SubjectType.NORMATIF, credits: 2 },
+    { code: 'BIN', name: 'Bahasa Indonesia', type: SubjectType.NORMATIF, credits: 2 },
+    { code: 'PKN', name: 'Pendidikan Kewarganegaraan', type: SubjectType.NORMATIF, credits: 1 },
+    { code: 'RPL', name: 'Rekayasa Perangkat Lunak', type: SubjectType.PRODUKTIF, credits: 4 },
+    { code: 'WEB', name: 'Pemrograman Web', type: SubjectType.PRODUKTIF, credits: 4 },
+    { code: 'DB', name: 'Basis Data', type: SubjectType.PRODUKTIF, credits: 3 },
+  ];
+  for (const s of subjectData) {
+    await prisma.subject.upsert({ where: { code: s.code }, update: {}, create: s });
+  }
+  const subjectRecords = await prisma.subject.findMany();
+
   // 3. Academic Year
   const ay = await prisma.academicYear.upsert({
     where: { name: '2023/2024' },

@@ -1,0 +1,592 @@
+# ROLE
+
+Act as:
+
+* Senior Enterprise System Auditor
+* Senior Fullstack QA Engineer
+* Senior Educational Systems Architect
+* Senior Database Integrity Specialist
+* Senior Realtime Infrastructure Engineer
+* Senior Security & Compliance Auditor
+* Senior Attendance Workflow Analyst
+
+PROJECT:
+"OSDAI NEURAL PULSE ATTENDANCE SYSTEM"
+
+MISSION:
+Perform a FULL ENTERPRISE AUDIT on the entire attendance ecosystem.
+
+THIS IS NOT:
+
+* superficial testing
+* UI-only checking
+* dummy validation
+* screenshot audit
+
+THIS MUST BE:
+
+* REAL WORK SYSTEM AUDIT
+* END-TO-END VALIDATION
+* DATABASE-LEVEL VERIFICATION
+* REALTIME EVENT AUDIT
+* LEGAL-GRADE ATTENDANCE VALIDATION
+* ZERO CONFLICT ANALYSIS
+* ENTERPRISE STABILITY TESTING
+
+========================================================
+PRIMARY AUDIT OBJECTIVE
+=======================
+
+Audit ALL attendance flows including:
+
+1. Teacher attendance signal activation
+2. Student response signal
+3. Realtime synchronization
+4. Attendance persistence
+5. Session lifecycle
+6. Attendance recap generation
+7. Audit logging
+8. PDF/Excel reporting
+9. Database integrity
+10. Timetable synchronization
+11. Subject-level attendance accuracy
+12. Duplicate prevention
+13. Role-based access security
+14. GPS validation
+15. Realtime dashboard consistency
+
+========================================================
+AUDIT SCOPE
+===========
+
+AUDIT THESE MODULES:
+
+* Teacher Dashboard
+* Student Dashboard
+* Neural Pulse Attendance
+* ClassSession Engine
+* Realtime Websocket/SSE
+* Attendance Database
+* Timetable Integration
+* Rekapitulasi Attendance
+* Export PDF/Excel
+* Audit Trail System
+* Role Permissions
+* API Validation
+* Redis Queue
+* Prisma Transactions
+* PostgreSQL Relations
+
+========================================================
+SECTION 1:
+TEACHER DASHBOARD AUDIT
+=======================
+
+AUDIT:
+Teacher attendance interface.
+
+VERIFY:
+
+---
+
+1. SIGNAL ACTIVATION
+
+---
+
+CHECK:
+
+* Can teacher activate signal?
+* Does session create successfully?
+* Does system validate timetable before activation?
+* Is correct subject loaded automatically?
+* Is correct class loaded automatically?
+* Is current jam pelajaran validated?
+
+VERIFY:
+
+* no duplicate sessions
+* no wrong class activation
+* no unauthorized access
+
+========================================================
+2. SIGNAL DEACTIVATION
+======================
+
+VERIFY:
+
+* signal closes correctly
+* students cannot respond after closed
+* previous attendance records remain intact
+* reopening signal does NOT reset attendance
+
+========================================================
+3. LIVE CONFIRMATION PANEL
+==========================
+
+VERIFY:
+
+* realtime updates work without refresh
+* new students appear instantly
+* confirmation timestamps accurate
+* duplicate confirmation impossible
+
+CHECK:
+
+* websocket event stability
+* no race conditions
+* no duplicated rendering
+
+========================================================
+4. SUBJECT SYNCHRONIZATION
+==========================
+
+VERIFY:
+Attendance automatically linked to:
+
+* correct subject
+* correct teacher
+* correct class
+* correct jam pelajaran
+* correct room
+
+========================================================
+5. TEACHER SECURITY AUDIT
+=========================
+
+VERIFY:
+Teacher CANNOT:
+
+* activate another teacher class
+* edit attendance illegally
+* delete attendance logs
+* manipulate timestamps
+
+========================================================
+SECTION 2:
+STUDENT DASHBOARD AUDIT
+=======================
+
+VERIFY ENTIRE STUDENT FLOW.
+
+---
+
+1. SIGNAL VISIBILITY
+
+---
+
+CHECK:
+Student only sees:
+"RESPON SINYAL"
+IF:
+
+* teacher signal active
+* correct class
+* valid schedule
+* within attendance window
+
+========================================================
+2. ATTENDANCE RESPONSE
+======================
+
+VERIFY:
+When student clicks:
+"RESPON SINYAL"
+
+SYSTEM MUST:
+
+* validate student
+* validate GPS
+* validate timetable
+* validate session token
+* validate duplicate attendance
+
+========================================================
+3. DUPLICATE PREVENTION
+=======================
+
+MANDATORY AUDIT:
+
+CHECK:
+student cannot:
+
+* attend twice
+* refresh exploit
+* multi-device exploit
+* duplicate websocket exploit
+
+VERIFY:
+Unique Constraint:
+(studentId + sessionId)
+
+========================================================
+4. ATTENDANCE STATUS
+====================
+
+VERIFY:
+After attendance:
+student dashboard changes to:
+"TERKONFIRMASI"
+
+DISPLAY:
+
+* timestamp
+* subject
+* teacher
+* integrity status
+
+========================================================
+5. STUDENT SECURITY AUDIT
+=========================
+
+VERIFY:
+student cannot:
+
+* fake attendance
+* spoof class
+* manipulate requests
+* bypass GPS
+* inject attendance via API
+
+========================================================
+SECTION 3:
+INTEGRATION AUDIT
+=================
+
+VERIFY FULL SYSTEM INTEGRATION.
+
+========================================================
+
+1. TIMETABLE ENGINE
+   ========================================================
+
+CHECK:
+attendance linked correctly to:
+
+* JadwalBlok
+* mapel
+* rombel
+* teacher
+* school year
+* semester
+
+VERIFY:
+NO attendance outside schedule.
+
+========================================================
+2. DATABASE RELATIONS
+=====================
+
+VERIFY:
+PostgreSQL foreign keys valid.
+
+CHECK:
+
+* orphan attendance records
+* invalid subject references
+* invalid session references
+* null critical fields
+
+========================================================
+3. REALTIME ENGINE
+==================
+
+AUDIT:
+
+* websocket stability
+* SSE events
+* socket rooms
+* event broadcasting
+* reconnect logic
+
+VERIFY:
+
+* no delayed confirmations
+* no missing attendance
+* no duplicate events
+
+========================================================
+4. REDIS / QUEUE AUDIT
+======================
+
+VERIFY:
+
+* queue processing stable
+* no lost attendance events
+* retry mechanism works
+* dead-letter queue configured
+
+========================================================
+SECTION 4:
+ATTENDANCE RESULT AUDIT
+=======================
+
+VERIFY OFFICIAL ATTENDANCE RECORDS.
+
+========================================================
+
+1. ATTENDANCE VALIDITY
+   ========================================================
+
+CHECK:
+Every attendance record contains:
+
+* student name
+* NISN
+* class
+* subject
+* teacher
+* timestamp
+* integrity score
+* GPS validation
+* session ID
+
+========================================================
+2. ATTENDANCE STATUS LOGIC
+==========================
+
+VERIFY:
+System correctly labels:
+
+* HADIR
+* TERLAMBAT
+* ALFA
+* INVALID
+
+========================================================
+3. REKAPITULASI AUDIT
+=====================
+
+VERIFY:
+Teacher recap:
+
+* totals correct
+* percentages correct
+* no duplicate counting
+* subject filtering accurate
+
+========================================================
+4. CROSS-CHECK VALIDATION
+=========================
+
+VERIFY:
+Total students present =
+actual attendance records.
+
+========================================================
+SECTION 5:
+REPORTING & EXPORT AUDIT
+========================
+
+AUDIT:
+PDF and Excel exports.
+
+========================================================
+
+1. PDF EXPORT
+   ========================================================
+
+VERIFY:
+PDF includes:
+
+* school header
+* teacher
+* subject
+* class
+* date
+* attendance table
+* QR validation
+* digital signature
+
+CHECK:
+
+* formatting clean
+* print-ready
+* no overflow
+* no broken layout
+
+========================================================
+2. EXCEL EXPORT
+===============
+
+VERIFY:
+
+* correct columns
+* proper formatting
+* no missing rows
+* no corrupted export
+
+========================================================
+3. QR VALIDATION
+================
+
+VERIFY:
+QR code validates:
+
+* report authenticity
+* report hash
+* session integrity
+
+========================================================
+SECTION 6:
+AUDIT LOG SYSTEM
+================
+
+MANDATORY.
+
+========================================================
+
+1. CREATE AUDIT TABLE
+   ========================================================
+
+FIELDS:
+
+* id
+* actorId
+* actorRole
+* action
+* module
+* oldData
+* newData
+* ipAddress
+* deviceInfo
+* timestamp
+
+========================================================
+2. TRACK ALL ACTIONS
+====================
+
+LOG:
+
+* teacher activate signal
+* teacher close signal
+* student attendance
+* attendance edit
+* export report
+* failed login
+* API manipulation attempts
+
+========================================================
+3. IMMUTABLE LOGGING
+====================
+
+VERIFY:
+audit logs cannot be deleted by normal users.
+
+========================================================
+4. LEGAL TRACEABILITY
+=====================
+
+VERIFY:
+Every attendance action traceable.
+
+========================================================
+SECTION 7:
+SECURITY AUDIT
+==============
+
+CHECK:
+
+* JWT validation
+* role-based access
+* API authorization
+* SQL injection
+* XSS
+* CSRF
+* replay attack
+* websocket hijacking
+
+========================================================
+SECTION 8:
+PERFORMANCE AUDIT
+=================
+
+SIMULATE:
+
+* 100 teachers active
+* 5000 students responding
+* realtime attendance spikes
+
+VERIFY:
+
+* no crash
+* no lag
+* no memory leak
+* no DB deadlock
+
+========================================================
+SECTION 9:
+UI/UX AUDIT
+===========
+
+VERIFY:
+
+* no broken layouts
+* no hydration mismatch
+* responsive mobile
+* responsive tablet
+* realtime smoothness
+* clean glassmorphism
+* no blank states
+
+========================================================
+SECTION 10:
+FINAL ENTERPRISE VALIDATION
+===========================
+
+GENERATE FULL AUDIT REPORT:
+
+========================================================
+REPORT CONTENT
+==============
+
+1. Critical Errors
+2. Security Vulnerabilities
+3. Realtime Failures
+4. Duplicate Attendance Risks
+5. Timetable Conflicts
+6. Database Integrity Issues
+7. Export Problems
+8. Audit Log Problems
+9. Performance Bottlenecks
+10. Recommended Fixes
+
+========================================================
+FINAL REQUIREMENT
+=================
+
+OUTPUT MUST INCLUDE:
+
+* architecture weaknesses
+* exact bug locations
+* exact file/module affected
+* root cause analysis
+* step-by-step fixes
+* optimized database design
+* optimized websocket logic
+* optimized attendance lifecycle
+* scalability recommendations
+
+IMPORTANT:
+DO NOT GIVE GENERIC FEEDBACK.
+
+AUDIT LIKE:
+A REAL ENTERPRISE SCHOOL SYSTEM
+USED DAILY BY THOUSANDS OF USERS.
+
+FIND:
+
+* hidden conflicts
+* duplicate risks
+* realtime inconsistencies
+* broken attendance states
+* invalid persistence logic
+* reporting mismatches
+* security vulnerabilities
+* scalability failures
+
+FINAL GOAL:
+1000% Stable
+1000% Professional
+1000% Real Work Attendance Ecosystem
+for
+SMK NEGERI 1 WONOGIRI.
