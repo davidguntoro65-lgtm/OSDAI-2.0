@@ -1,0 +1,403 @@
+# ROLE:
+Senior Academic System Architect, Senior Curriculum Database Engineer, and Enterprise School ERP Developer.
+
+# TASK:
+Build COMPLETE SUBJECT (MAPEL) MASTER DATA for OSDAI DEMO ATTENDANCE SYSTEM.
+
+# MANDATE:
+All attendance sessions MUST use REAL SUBJECT DATA.
+No dummy placeholders.
+No generic "Mapel 1".
+No broken integration.
+
+Attendance, Schedule, Teacher, Class, Report, and Dashboard MUST all connect to REAL SUBJECT STRUCTURE.
+
+====================================================
+1. OBJECTIVE
+====================================================
+
+Create:
+----------------------------------------------------
+
+MASTER DATA MATA PELAJARAN
+for:
+
+✓ Penjadwalan
+✓ Presensi
+✓ Dashboard Guru
+✓ Dashboard Siswa
+✓ Monitoring Kepala Sekolah
+✓ Rekapitulasi Kehadiran
+✓ Export PDF/Excel
+✓ Neural Pulse Attendance
+✓ Session Validation
+
+====================================================
+2. CURRICULUM STRUCTURE
+====================================================
+
+Build:
+----------------------------------------------------
+
+REALISTIC SMK SUBJECT STRUCTURE.
+
+====================================================
+GROUP:
+====================================================
+
+A. UMUM / NORMATIF
+B. ADAPTIF
+C. PRODUKTIF
+
+====================================================
+3. SUBJECT MASTER TABLE
+====================================================
+
+CREATE TABLE:
+----------------------------------------------------
+
+MasterMapel
+
+====================================================
+FIELDS:
+====================================================
+
+✓ id
+✓ kode_mapel
+✓ nama_mapel
+✓ kategori_mapel
+✓ program_studi
+✓ tingkat_kelas
+✓ jam_per_minggu
+✓ warna_mapel
+✓ icon_mapel
+✓ status_aktif
+✓ created_at
+✓ updated_at
+
+====================================================
+4. MAPEL UMUM / NORMATIF
+====================================================
+
+CREATE:
+----------------------------------------------------
+
+1. Pendidikan Agama dan Budi Pekerti
+2. PPKN
+3. Bahasa Indonesia
+4. Matematika
+5. Bahasa Inggris
+6. Pendidikan Jasmani
+7. Seni Budaya
+8. Informatika
+9. Sejarah Indonesia
+
+====================================================
+5. MAPEL ADAPTIF
+====================================================
+
+CREATE:
+----------------------------------------------------
+
+1. Dasar-Dasar Kejuruan
+2. Projek Kreatif dan Kewirausahaan
+3. Simulasi Digital
+4. Komunikasi Industri
+5. Etika Profesi
+
+====================================================
+6. MAPEL PRODUKTIF AKL
+====================================================
+
+PROGRAM:
+----------------------------------------------------
+
+AKL
+(Akuntansi dan Keuangan Lembaga)
+
+CREATE:
+----------------------------------------------------
+
+1. Akuntansi Dasar
+2. Spreadsheet Akuntansi
+3. Perbankan Dasar
+4. Akuntansi Keuangan
+5. Komputer Akuntansi
+6. Administrasi Pajak
+7. Praktikum Akuntansi Perusahaan
+
+====================================================
+7. MAPEL PRODUKTIF MPLB
+====================================================
+
+PROGRAM:
+----------------------------------------------------
+
+MPLB
+(Manajemen Perkantoran dan Layanan Bisnis)
+
+CREATE:
+----------------------------------------------------
+
+1. Administrasi Umum
+2. Korespondensi Bisnis
+3. Otomatisasi Tata Kelola Perkantoran
+4. Kearsipan Digital
+5. Public Relation Dasar
+6. Komunikasi Kantor
+7. Teknologi Perkantoran
+
+====================================================
+8. MAPEL PRODUKTIF PM
+====================================================
+
+PROGRAM:
+----------------------------------------------------
+
+PM
+(Pemasaran)
+
+CREATE:
+----------------------------------------------------
+
+1. Dasar Pemasaran
+2. Digital Marketing
+3. Penjualan Retail
+4. Komunikasi Bisnis
+5. Manajemen Produk
+6. Administrasi Transaksi
+7. Branding dan Promosi
+
+====================================================
+9. MAPEL PRODUKTIF TB
+====================================================
+
+PROGRAM:
+----------------------------------------------------
+
+TB
+(Tata Boga / Kuliner)
+
+CREATE:
+----------------------------------------------------
+
+1. Dasar Kuliner
+2. Pengolahan Makanan Indonesia
+3. Bakery dan Pastry
+4. Hygiene dan Sanitasi
+5. Tata Hidang
+6. Pengolahan Minuman
+7. Gizi Kuliner
+
+====================================================
+10. MAPEL PRODUKTIF TBS
+====================================================
+
+PROGRAM:
+----------------------------------------------------
+
+TBS
+(Tata Busana)
+
+CREATE:
+----------------------------------------------------
+
+1. Dasar Tata Busana
+2. Desain Busana
+3. Pola Dasar
+4. Teknik Menjahit
+5. Tekstil dan Bahan
+6. Fashion Digital
+7. Produksi Busana
+
+====================================================
+11. MAPEL INTEGRATION
+====================================================
+
+ALL SUBJECTS MUST CONNECT TO:
+----------------------------------------------------
+
+✓ Guru
+✓ Jadwal
+✓ Presensi
+✓ Kelas
+✓ Rombel
+✓ Rekapitulasi
+✓ Dashboard Kepsek
+✓ Neural Pulse Session
+
+====================================================
+12. SESSION VALIDATION
+====================================================
+
+VERY IMPORTANT.
+
+When teacher activates attendance signal:
+----------------------------------------------------
+
+system MUST validate:
+
+✓ guru mengajar mapel itu
+✓ mapel sesuai jadwal
+✓ mapel sesuai jam aktif
+✓ kelas sesuai rombel
+✓ tidak bentrok
+
+====================================================
+13. ATTENDANCE RECORD
+====================================================
+
+EVERY PRESENSI RECORD MUST STORE:
+----------------------------------------------------
+
+✓ nama_mapel
+✓ kode_mapel
+✓ guru_pengampu
+✓ kelas
+✓ jam_ke
+✓ waktu_presensi
+
+====================================================
+14. COLOR SYSTEM
+====================================================
+
+MAPEL MUST HAVE COLORS:
+----------------------------------------------------
+
+Normatif:
+→ Blue
+
+Adaptif:
+→ Purple
+
+Produktif:
+→ Orange
+
+====================================================
+15. ICON SYSTEM
+====================================================
+
+Each subject MUST have:
+----------------------------------------------------
+
+✓ Lucide Icon
+or
+✓ Heroicon
+
+Examples:
+----------------------------------------------------
+
+Akuntansi:
+→ Calculator Icon
+
+Kuliner:
+→ Chef Hat
+
+Pemasaran:
+→ Megaphone
+
+Busana:
+→ Shirt
+
+====================================================
+16. DEMO SCHEDULE LINK
+====================================================
+
+VERY IMPORTANT.
+
+Create:
+----------------------------------------------------
+
+REALISTIC timetable mapping.
+
+====================================================
+EXAMPLE:
+====================================================
+
+X AKL 1
+----------------------------------------------------
+
+Senin Jam 1:
+Bahasa Indonesia
+
+Senin Jam 2:
+Matematika
+
+Senin Jam 3:
+Akuntansi Dasar
+
+Senin Jam 4:
+Spreadsheet Akuntansi
+
+====================================================
+17. GURU LINKING
+====================================================
+
+Each subject MUST have:
+----------------------------------------------------
+
+✓ guru pengampu
+✓ jadwal mengajar
+✓ kelas ajar
+
+====================================================
+18. DASHBOARD DISPLAY
+====================================================
+
+DISPLAY MAPEL:
+----------------------------------------------------
+
+✓ colored badges
+✓ subject icon
+✓ active session
+✓ next lesson
+✓ attendance summary
+
+====================================================
+19. EXPORT INTEGRATION
+====================================================
+
+Mapel MUST appear in:
+----------------------------------------------------
+
+✓ laporan presensi
+✓ PDF
+✓ Excel
+✓ dashboard
+✓ monitoring kepala sekolah
+
+====================================================
+20. FINAL VALIDATION
+====================================================
+
+VERIFY:
+----------------------------------------------------
+
+✓ all mapel connected
+✓ no orphan subject
+✓ no empty schedule
+✓ no invalid attendance session
+✓ no subject mismatch
+✓ no duplicate mapel code
+
+====================================================
+21. FINAL EXECUTION
+====================================================
+
+Build:
+----------------------------------------------------
+
+✓ Full SMK Subject Ecosystem
+✓ Real attendance-ready curriculum
+✓ Professional mapel integration
+✓ Production-ready subject master
+✓ Fully integrated attendance logic
+
+NO PLACEHOLDER.
+NO EMPTY SUBJECT.
+NO GENERIC DATA.
+
+ALL SUBJECTS MUST FEEL LIKE
+REAL OPERATIONAL SMK SYSTEM.
+
+EXECUTE IMMEDIATELY.

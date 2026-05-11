@@ -1,0 +1,556 @@
+# ROLE:
+Senior Enterprise Data Architect, Senior Seeder Engineer, Senior Educational ERP Architect, and Production Environment Specialist.
+
+# TASK:
+Build a FULL PRODUCTION DEMO MODE SYSTEM for OSDAI (Otomatisasi Sekolah Digital Berbasis Artificial Intelligent).
+
+# PRIMARY GOAL:
+Create a complete realistic dummy ecosystem so:
+- system can be tested immediately
+- all role dashboards contain real data
+- no empty modules
+- no blank tables
+- presentation-ready
+- deployment-ready
+- migration-safe
+- production-safe
+
+# VERY IMPORTANT:
+When deployed from localhost → cPanel → VPS → new domain:
+----------------------------------------------------
+
+✓ dummy data MUST remain stable
+✓ data MUST NOT disappear
+✓ all relationships MUST remain valid
+✓ schedule integration MUST continue working
+
+====================================================
+1. DEMO MODE CONCEPT
+====================================================
+
+Create:
+----------------------------------------------------
+
+"OSDAI DEMO MODE"
+
+Purpose:
+----------------------------------------------------
+
+✓ testing
+✓ presentation
+✓ UI demonstration
+✓ integration testing
+✓ role simulation
+✓ production preview
+
+====================================================
+2. DEMO DATA PRINCIPLE
+====================================================
+
+DEMO DATA MUST FEEL:
+----------------------------------------------------
+
+✓ realistic
+✓ interconnected
+✓ operational
+✓ school-like
+✓ production-ready
+
+NOT:
+----------------------------------------------------
+
+❌ random lorem ipsum
+❌ fake broken data
+❌ empty modules
+❌ disconnected tables
+
+====================================================
+3. CORE DEMO STRUCTURE
+====================================================
+
+Create FULL interconnected data for:
+
+----------------------------------------------------
+MASTER DATA
+----------------------------------------------------
+
+✓ siswa
+✓ guru
+✓ kepala sekolah
+✓ admin
+✓ program studi
+✓ mapel
+✓ kelas
+✓ rombel
+✓ jadwal
+✓ presensi
+✓ laporan
+✓ pengumuman
+✓ ruang kelas
+
+====================================================
+4. PROGRAM STUDI
+====================================================
+
+CREATE:
+----------------------------------------------------
+
+1. AKL
+   Akuntansi dan Keuangan Lembaga
+
+2. MPLB
+   Manajemen Perkantoran dan Layanan Bisnis
+
+3. PM
+   Pemasaran
+
+4. TB
+   Tata Boga / Kuliner
+
+5. TBS
+   Tata Busana
+
+====================================================
+5. DEMO CLASS STRUCTURE
+====================================================
+
+FOR INITIAL DEMO:
+create 3 active classes.
+
+====================================================
+CLASS LIST
+====================================================
+
+1. X AKL 1
+2. X MPLB 1
+3. X TB 1
+
+====================================================
+6. STUDENT DEMO DATA
+====================================================
+
+Create:
+----------------------------------------------------
+
+minimum 15 students per class.
+
+TOTAL:
+----------------------------------------------------
+
+45 students minimum.
+
+====================================================
+STUDENT DATA
+====================================================
+
+Each student MUST have:
+----------------------------------------------------
+
+✓ nama lengkap
+✓ NISN
+✓ username
+✓ password
+✓ email
+✓ device ID
+✓ kelas
+✓ program studi
+✓ jadwal
+✓ presensi history
+
+====================================================
+7. GURU DEMO DATA
+====================================================
+
+Create:
+----------------------------------------------------
+
+minimum 8 guru.
+
+====================================================
+EACH GURU MUST HAVE:
+====================================================
+
+✓ nama
+✓ NIP
+✓ mapel
+✓ jadwal mengajar
+✓ akun login
+✓ kelas ajar
+
+====================================================
+8. MAPEL STRUCTURE
+====================================================
+
+CREATE:
+----------------------------------------------------
+
+Normatif:
+✓ Bahasa Indonesia
+✓ PPKN
+✓ Bahasa Inggris
+
+Adaptif:
+✓ Matematika
+✓ Informatika
+
+Produktif:
+✓ Akuntansi Dasar
+✓ Administrasi Perkantoran
+✓ Dasar Pemasaran
+✓ Dasar Kuliner
+✓ Dasar Tata Busana
+
+====================================================
+9. DEMO SCHEDULE SYSTEM
+====================================================
+
+VERY IMPORTANT.
+
+Build realistic timetable.
+
+====================================================
+RULES:
+====================================================
+
+✓ every class has full schedule
+✓ every guru linked to real mapel
+✓ no schedule collision
+✓ no duplicate teaching hour
+✓ integrated to attendance
+
+====================================================
+10. DEMO PRESENSI DATA
+====================================================
+
+Create realistic attendance history.
+
+====================================================
+EXAMPLES:
+====================================================
+
+✓ hadir
+✓ izin
+✓ sakit
+✓ alfa
+✓ terlambat
+
+====================================================
+ATTENDANCE MUST LINK TO:
+====================================================
+
+✓ siswa
+✓ guru
+✓ kelas
+✓ mapel
+✓ jam pelajaran
+✓ tanggal
+
+====================================================
+11. DEMO LOGIN ACCOUNTS
+====================================================
+
+====================================================
+SUPER ADMIN
+====================================================
+
+username:
+superadmin_osdai
+
+password:
+osdai123
+
+====================================================
+KEPALA SEKOLAH
+====================================================
+
+username:
+kepsek_osdai
+
+password:
+wonogiri123
+
+====================================================
+ADMIN
+====================================================
+
+username:
+admin_osdai
+
+password:
+admin123
+
+====================================================
+GURU
+====================================================
+
+username:
+guru_akl
+
+password:
+guru123
+
+====================================================
+SISWA
+====================================================
+
+username:
+siswa_akl01
+
+password:
+siswa123
+
+====================================================
+12. DATABASE SEEDER SYSTEM
+====================================================
+
+VERY IMPORTANT.
+
+Build:
+----------------------------------------------------
+
+AUTOMATIC SEEDER SYSTEM.
+
+====================================================
+FEATURES:
+====================================================
+
+✓ auto insert demo data
+✓ relational integrity
+✓ idempotent seeding
+✓ safe rerun
+✓ no duplicate records
+
+====================================================
+13. PRODUCTION SAFE SEEDER
+====================================================
+
+Seeder MUST:
+----------------------------------------------------
+
+✓ work in localhost
+✓ work in cPanel
+✓ work after migration
+✓ work after deployment
+
+====================================================
+14. DUMMY DATA PERSISTENCE
+====================================================
+
+VERY IMPORTANT.
+
+WHEN DEPLOYING:
+----------------------------------------------------
+
+✓ data MUST remain
+✓ IDs MUST remain valid
+✓ relations MUST remain stable
+
+DO NOT:
+----------------------------------------------------
+
+❌ reset production data
+❌ overwrite live data
+❌ destroy uploaded records
+
+====================================================
+15. TIMETABLE CSV IMPORT OVERRIDE
+====================================================
+
+CRITICAL FEATURE.
+
+When admin uploads REAL timetable CSV:
+----------------------------------------------------
+
+SYSTEM MUST:
+----------------------------------------------------
+
+✓ detect demo schedule
+✓ replace ONLY dummy timetable
+✓ preserve real users
+✓ preserve production settings
+✓ preserve audit logs
+
+====================================================
+16. SMART REPLACEMENT LOGIC
+====================================================
+
+IMPLEMENT:
+----------------------------------------------------
+
+Schedule Versioning System.
+
+====================================================
+RULES:
+====================================================
+
+If:
+----------------------------------------------------
+
+schedule_source = DEMO
+
+AND:
+----------------------------------------------------
+
+new CSV imported
+
+THEN:
+----------------------------------------------------
+
+✓ replace demo schedule
+✓ rebuild class mapping
+✓ rebuild teacher mapping
+✓ rebuild attendance session
+
+====================================================
+17. REAL DATA PROTECTION
+====================================================
+
+IF DATA SOURCE:
+----------------------------------------------------
+
+REAL
+
+THEN:
+----------------------------------------------------
+
+NEVER overwrite automatically.
+
+====================================================
+18. IMPORT VALIDATION
+====================================================
+
+WHEN CSV IMPORTED:
+----------------------------------------------------
+
+validate:
+✓ kelas
+✓ guru
+✓ mapel
+✓ jam
+✓ room
+✓ collision
+✓ duplicate session
+
+====================================================
+19. DEMO MODE INDICATOR
+====================================================
+
+SHOW:
+----------------------------------------------------
+
+"MODE DEMO OSDAI"
+
+at top navbar.
+
+====================================================
+WHEN REAL TIMETABLE IMPORTED:
+====================================================
+
+auto hide demo indicator.
+
+====================================================
+20. EMPTY MODULE PREVENTION
+====================================================
+
+ALL MODULES MUST CONTAIN:
+----------------------------------------------------
+
+✓ demo charts
+✓ demo analytics
+✓ demo logs
+✓ demo reports
+✓ demo notifications
+
+====================================================
+21. DEMO ANALYTICS
+====================================================
+
+CREATE:
+----------------------------------------------------
+
+✓ grafik kehadiran
+✓ aktivitas guru
+✓ statistik kelas
+✓ monitoring siswa
+✓ laporan keterlambatan
+
+====================================================
+22. FILE IMPORT SYSTEM
+====================================================
+
+SUPPORT:
+----------------------------------------------------
+
+✓ CSV
+✓ XLSX
+✓ XML
+
+====================================================
+23. IMPORT RESULT ENGINE
+====================================================
+
+AFTER IMPORT:
+----------------------------------------------------
+
+show:
+✓ imported rows
+✓ failed rows
+✓ duplicate rows
+✓ conflict warning
+✓ replacement summary
+
+====================================================
+24. ARCHITECTURE
+====================================================
+
+CREATE:
+----------------------------------------------------
+
+/prisma/seeds
+/demo-data
+/import-engine
+/version-control
+
+====================================================
+25. FINAL QUALITY CONTROL
+====================================================
+
+VERIFY:
+----------------------------------------------------
+
+✓ no empty dashboard
+✓ no broken relationship
+✓ no orphan data
+✓ no schedule conflict
+✓ no duplicate attendance
+✓ no blank report
+✓ no fake placeholder
+✓ import replacement works
+✓ deployment safe
+
+====================================================
+26. FINAL EXECUTION
+====================================================
+
+Build:
+----------------------------------------------------
+
+✓ enterprise demo mode
+✓ persistent demo data
+✓ realistic school ecosystem
+✓ production-safe seeding
+✓ timetable override system
+✓ smart CSV replacement engine
+✓ role-ready demo accounts
+
+SYSTEM MUST FEEL:
+----------------------------------------------------
+
+like a real operational school ecosystem,
+not a prototype.
+
+ZERO ERROR.
+ZERO BROKEN RELATION.
+ZERO EMPTY MODULE.
+
+EXECUTE IMMEDIATELY.
