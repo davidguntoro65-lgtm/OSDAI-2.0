@@ -50,12 +50,12 @@ export default function TimetableModule({ authToken }: { authToken: string }) {
 
   const fetchClasses = async () => {
     try {
-      const res = await fetch('/api/academic/classes', {
+      const res = await fetch('/api/classes', {
         headers: { 'Authorization': `Bearer ${authToken}` }
       });
       const data = await res.json();
-      setClasses(data);
-      if (data.length > 0) setSelectedClassId(data[0].id);
+      setClasses(Array.isArray(data) ? data : []);
+      if (Array.isArray(data) && data.length > 0) setSelectedClassId(data[0].id);
     } catch (err) {
       console.error(err);
     }

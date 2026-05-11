@@ -75,10 +75,11 @@ const getNavItems = (role: string) => {
     { id: 'beranda',     label: 'Beranda Sistem',          icon: BarChart3,      roles: ['SUPER_ADMIN', 'TU', 'KEPALA_SEKOLAH'] },
     { id: 'monitoring',  label: 'Ruang Kendali',           icon: Eye,            roles: ['KEPALA_SEKOLAH', 'SUPER_ADMIN'] },
     { id: 'presensi',    label: 'Sistem Presensi Cerdas',  icon: Radio,          roles: ['GURU', 'SISWA', 'SUPER_ADMIN', 'TU'] },
+    { id: 'lms',         label: 'Ruang Belajar Digital',   icon: BookOpen,       roles: ['GURU', 'SISWA', 'SUPER_ADMIN'] },
     { id: 'siswa',       label: 'Manajemen Siswa',         icon: Users,          roles: ['SUPER_ADMIN', 'TU', 'KEPALA_SEKOLAH'] },
-    { id: 'guru',        label: 'Manajemen Guru',          icon: BookOpen,       roles: ['SUPER_ADMIN', 'TU', 'KEPALA_SEKOLAH'] },
+    { id: 'guru',        label: 'Manajemen Guru',          icon: GraduationCap,  roles: ['SUPER_ADMIN', 'TU', 'KEPALA_SEKOLAH'] },
     { id: 'keuangan',    label: 'Keuangan & SPP',          icon: DollarSign,     roles: ['SUPER_ADMIN', 'TU', 'BENDAHARA'] },
-    { id: 'jadwal',      label: 'Jadwal Pelajaran',        icon: GraduationCap,  roles: ['SUPER_ADMIN', 'TU', 'KEPALA_SEKOLAH', 'GURU'] },
+    { id: 'jadwal',      label: 'Jadwal Pelajaran',        icon: MessageSquare,  roles: ['SUPER_ADMIN', 'TU', 'KEPALA_SEKOLAH', 'GURU'] },
     { id: 'arsip',       label: 'Arsip Digital',           icon: Archive,        roles: ['SUPER_ADMIN', 'TU'] },
     { id: 'surat',       label: 'Pusat Surat Digital',     icon: FileText,       roles: ['SUPER_ADMIN', 'TU', 'KEPALA_SEKOLAH'] },
     { id: 'analitik',   label: 'Analitik Pembelajaran',   icon: Sparkles,       roles: ['SUPER_ADMIN', 'KEPALA_SEKOLAH', 'BK'] },
@@ -479,6 +480,7 @@ export default function App() {
                     : <MobileGuruPresensi authToken={token!} user={user} />
                 )}
 
+                {activeTab === 'lms' && <LMSModule authToken={token!} userRole={user?.role} />}
                 {activeTab === 'siswa' && <StudentModule authToken={token!} />}
                 {activeTab === 'guru' && <TeacherModule authToken={token!} />}
                 {activeTab === 'keuangan' && <FinanceModule authToken={token!} userRole={user?.role} />}

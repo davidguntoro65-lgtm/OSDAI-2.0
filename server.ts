@@ -858,6 +858,13 @@ async function startServer() {
         req.body.subjectId,
         req.body.scheduleId
       );
+      // Notify all connected clients that a new session has been opened
+      io.emit('session-opened', {
+        sessionId: session.id,
+        classId: session.classId,
+        subjectName: (session as any).subject?.name ?? '',
+        teacherName: (session as any).teacher?.user?.name ?? '',
+      });
       res.json(session);
     } catch (error: any) {
       res.status(400).json({ error: error.message });

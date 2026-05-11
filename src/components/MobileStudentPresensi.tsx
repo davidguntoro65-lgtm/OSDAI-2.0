@@ -87,14 +87,14 @@ export default function MobileStudentPresensi({
       if (res.ok) {
         const data = await res.json();
         setActiveSession(data);
-        if (status === 'IDLE') setStatus('FOUND');
+        setStatus(prev => prev === 'IDLE' ? 'FOUND' : prev);
       } else {
         setActiveSession(null);
-        if (status !== 'CONFIRMED' && status !== 'ALREADY_CONFIRMED') setStatus('IDLE');
+        setStatus(prev => (prev !== 'CONFIRMED' && prev !== 'ALREADY_CONFIRMED') ? 'IDLE' : prev);
       }
     } catch { /* no-op */ }
     finally { setLoadingSession(false); }
-  }, [authToken, status]);
+  }, [authToken]);
 
   const fetchHistory = useCallback(async () => {
     try {
