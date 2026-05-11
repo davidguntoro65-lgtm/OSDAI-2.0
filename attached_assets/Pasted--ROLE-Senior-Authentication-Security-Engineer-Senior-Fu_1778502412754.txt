@@ -1,0 +1,492 @@
+# ROLE:
+Senior Authentication Security Engineer, Senior Fullstack Architect, Senior Email Infrastructure Engineer, and Enterprise UX Designer.
+
+# TASK:
+Build a complete "Lupa Password + OTP Email Verification" system for OSDAI (Otomatisasi Sekolah Digital Berbasis Artificial Intelligent).
+
+# MANDATE:
+REAL WORK SYSTEM.
+PRODUCTION READY.
+ZERO SECURITY HOLE.
+ZERO HARD-CODE API KEY.
+USER-FRIENDLY.
+ALL ROLE SUPPORTED.
+FULL DATABASE INTEGRATION.
+MOBILE RESPONSIVE.
+NO PLACEHOLDER.
+NO FAKE OTP.
+
+====================================================
+1. SYSTEM OBJECTIVE
+====================================================
+
+Users often forget passwords.
+
+Build a secure recovery system using:
+- OTP Email Verification
+- Secure Token Validation
+- Expired OTP Handling
+- Session Protection
+- Audit Logging
+
+====================================================
+2. SUPPORTED ROLES
+====================================================
+
+ALL ROLES MUST SUPPORT PASSWORD RESET:
+
+- SUPER_ADMIN
+- ADMIN
+- KEPALA_SEKOLAH
+- GURU
+- SISWA
+- ORANG_TUA
+
+====================================================
+3. REAL WORKFLOW
+====================================================
+
+====================================================
+STEP 1 — USER CLICK "LUPA PASSWORD"
+====================================================
+
+User enters:
+- Email terdaftar
+OR
+- Username
+
+System validates:
+- user exists
+- account active
+- email verified
+
+====================================================
+STEP 2 — GENERATE OTP
+====================================================
+
+Generate:
+- 6 digit OTP random
+- cryptographically secure
+
+Example:
+483921
+
+====================================================
+OTP SECURITY RULES
+====================================================
+
+- OTP valid only 5 minutes
+- OTP single-use
+- OTP hashed before saving to database
+- max resend: 3x
+- max verify attempts: 5x
+- auto invalidate after success
+
+====================================================
+4. EMAIL DELIVERY SYSTEM
+====================================================
+
+USE:
+Nodemailer OR Resend API.
+
+IMPORTANT:
+ALL API KEYS MUST BE STORED IN:
+.env
+
+NEVER HARDCODE.
+
+====================================================
+ENV STRUCTURE
+====================================================
+
+DATABASE_URL=
+
+JWT_SECRET=
+
+EMAIL_PROVIDER=
+
+SMTP_HOST=
+SMTP_PORT=
+SMTP_USER=
+SMTP_PASS=
+
+OR
+
+RESEND_API_KEY=
+
+====================================================
+5. EMAIL TEMPLATE
+====================================================
+
+Create:
+professional Indonesian formal email.
+
+====================================================
+EMAIL CONTENT
+====================================================
+
+Subject:
+Kode OTP Reset Password OSDAI
+
+Isi:
+- Nama pengguna
+- Kode OTP
+- Masa berlaku OTP
+- Warning keamanan
+- Footer resmi OSDAI
+
+====================================================
+6. DATABASE STRUCTURE
+====================================================
+
+CREATE TABLE:
+PasswordResetOTP
+
+FIELDS:
+----------------------------------------------------
+
+id
+userId
+otpHash
+expiredAt
+attemptCount
+isUsed
+createdAt
+updatedAt
+ipAddress
+deviceInfo
+
+====================================================
+7. DEVICE DETECTION
+====================================================
+
+Store:
+- browser
+- operating system
+- device type
+- IP address
+
+Purpose:
+security audit.
+
+====================================================
+8. SECURITY FEATURES
+====================================================
+
+MANDATORY:
+----------------------------------------------------
+
+- rate limiting
+- brute-force protection
+- request throttling
+- invalid token handling
+- CSRF protection
+- XSS sanitization
+- SQL injection prevention
+
+====================================================
+9. RESET PASSWORD FLOW
+====================================================
+
+====================================================
+STEP 1:
+====================================================
+
+User input email.
+
+====================================================
+STEP 2:
+====================================================
+
+System sends OTP.
+
+====================================================
+STEP 3:
+====================================================
+
+User input OTP.
+
+====================================================
+STEP 4:
+====================================================
+
+If valid:
+show form:
+- Password Baru
+- Konfirmasi Password
+
+====================================================
+PASSWORD VALIDATION
+====================================================
+
+Minimum:
+- 8 karakter
+- huruf besar
+- huruf kecil
+- angka
+
+====================================================
+STEP 5:
+====================================================
+
+Update password:
+- hash using bcrypt
+- invalidate previous sessions
+- save audit log
+
+====================================================
+10. SESSION INVALIDATION
+====================================================
+
+IMPORTANT.
+
+When password changed:
+----------------------------------------------------
+
+- logout all devices
+- revoke old JWT
+- clear refresh tokens
+- force re-login
+
+====================================================
+11. AUDIT LOG SYSTEM
+====================================================
+
+CREATE TABLE:
+SecurityAuditLog
+
+FIELDS:
+----------------------------------------------------
+
+id
+userId
+action
+ipAddress
+deviceInfo
+status
+createdAt
+
+====================================================
+LOG EVENTS
+====================================================
+
+- request OTP
+- resend OTP
+- invalid OTP
+- successful verification
+- password changed
+- suspicious activity
+
+====================================================
+12. USER INTERFACE — MOBILE FIRST
+====================================================
+
+THEME:
+OSDAI Glassmorphism AI Theme.
+
+====================================================
+SCREEN 1:
+====================================================
+
+LUPA PASSWORD
+
+Fields:
+- Email / Username
+
+Button:
+[KIRIM KODE OTP]
+
+====================================================
+SCREEN 2:
+====================================================
+
+VERIFIKASI OTP
+
+Fields:
+- OTP Code (6 digit)
+
+Button:
+[VERIFIKASI]
+
+====================================================
+SCREEN 3:
+====================================================
+
+PASSWORD BARU
+
+Fields:
+- Password Baru
+- Konfirmasi Password
+
+Button:
+[SIMPAN PASSWORD]
+
+====================================================
+13. UX REQUIREMENTS
+====================================================
+
+MANDATORY:
+----------------------------------------------------
+
+- responsive mobile
+- realtime validation
+- loading indicator
+- resend timer countdown
+- disabled spam button
+- success animation
+- clean error message
+
+====================================================
+14. ERROR HANDLING
+====================================================
+
+SHOW FORMAL INDONESIAN MESSAGES:
+
+====================================================
+INVALID EMAIL
+====================================================
+
+"Email tidak ditemukan dalam sistem."
+
+====================================================
+WRONG OTP
+====================================================
+
+"Kode OTP tidak valid."
+
+====================================================
+EXPIRED OTP
+====================================================
+
+"Masa berlaku kode OTP telah habis."
+
+====================================================
+SUCCESS
+====================================================
+
+"Password berhasil diperbarui."
+
+====================================================
+15. ADMIN MONITORING PANEL
+====================================================
+
+Create:
+Security Monitoring Dashboard.
+
+====================================================
+FEATURES
+====================================================
+
+- melihat percobaan reset password
+- mendeteksi spam OTP
+- melihat perangkat login
+- blacklist IP mencurigakan
+- statistik keamanan akun
+
+====================================================
+16. INTEGRATION WITH ALL ROLE
+====================================================
+
+ALL LOGIN PAGES MUST HAVE:
+----------------------------------------------------
+
+"Lupa Password?"
+
+linked to:
+----------------------------------------------------
+
+/auth/lupa-password
+
+====================================================
+17. EMAIL VERIFICATION STATUS
+====================================================
+
+IMPORTANT.
+
+User MUST verify email first.
+
+Add field:
+----------------------------------------------------
+
+isEmailVerified
+
+If false:
+show:
+----------------------------------------------------
+
+"Email belum diverifikasi."
+
+====================================================
+18. OPTIONAL FUTURE READY
+====================================================
+
+Prepare architecture for:
+----------------------------------------------------
+
+- OTP WhatsApp
+- Google Authenticator
+- Face Verification
+- Multi Factor Authentication (MFA)
+
+====================================================
+19. TYPESCRIPT + BACKEND QUALITY
+====================================================
+
+MANDATORY:
+----------------------------------------------------
+
+- zero typescript error
+- strict typing
+- reusable service
+- modular architecture
+- clean folder structure
+- repository pattern
+- DTO validation
+- zod/class-validator
+
+====================================================
+20. FINAL TESTING
+====================================================
+
+TEST:
+----------------------------------------------------
+
+✓ request OTP
+✓ resend OTP
+✓ invalid OTP
+✓ expired OTP
+✓ password reset success
+✓ mobile responsive
+✓ JWT invalidation
+✓ audit logging
+✓ brute force protection
+✓ rate limit working
+✓ email sending success
+
+====================================================
+21. FINAL EXECUTION
+====================================================
+
+Build:
+- backend
+- frontend
+- database
+- OTP engine
+- email service
+- audit log
+- mobile responsive UI
+- admin monitoring dashboard
+
+Ensure:
+- real work
+- production ready
+- secure
+- scalable
+- professional Indonesian language
+- no placeholder
+- no hardcoded secret
+- zero conflict
+- zero broken route
+- zero fake implementation
+
+EXECUTE IMMEDIATELY.
