@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Role } from '@prisma/client';
 import { motion, AnimatePresence } from 'motion/react';
 import { BrainCircuit, Lock, Loader2 } from 'lucide-react';
+import ForgotPasswordScreen from '@/components/ForgotPasswordScreen';
 
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -73,6 +74,7 @@ export default function App() {
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [loginError, setLoginError] = useState('');
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
   // For admin beranda sub-navigation (siswa/guru modules)
   const [adminSubPage, setAdminSubPage] = useState<string | null>(null);
 
@@ -140,6 +142,12 @@ export default function App() {
     setAdminSubPage(null);
     setActiveTab(toMobileTab(tab));
   };
+
+  // ── FORGOT PASSWORD SCREEN ───────────────────────────────────────────────────
+
+  if (showForgotPassword) {
+    return <ForgotPasswordScreen onBack={() => setShowForgotPassword(false)} />;
+  }
 
   // ── LOGIN SCREEN ─────────────────────────────────────────────────────────────
 
@@ -253,6 +261,16 @@ export default function App() {
                     <><Lock size={16} className="mr-2" /> MASUK KE SISTEM</>
                   )}
                 </Button>
+
+                <div className="text-center pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowForgotPassword(true)}
+                    className="text-[11px] font-black text-orange-500 hover:text-orange-400 transition-colors underline-offset-2 hover:underline"
+                  >
+                    Lupa Password?
+                  </button>
+                </div>
               </form>
 
               <div className="mt-6 pt-5 border-t border-white/20">

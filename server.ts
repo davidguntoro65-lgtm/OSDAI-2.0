@@ -14,6 +14,7 @@ import { InventoryService } from './src/services/inventory';
 import { DocumentService } from './src/services/document';
 import { GpsService } from './src/services/gps';
 import { AuthService } from './src/services/auth';
+import { OTPService } from './src/services/otpService';
 import { IntelligenceService } from './src/services/intelligence';
 import { createServer } from "http";
 import { Server } from "socket.io";
@@ -107,6 +108,70 @@ async function startServer() {
 
   app.get('/api/auth/me', authenticate, (req: AuthRequest, res) => {
     res.json(req.user);
+  });
+
+  // ── OTP / Forgot Password Routes ─────────────────────────────────
+
+  // POST /api/auth/forgot-password — request OTP
+  app.post('/api/auth/forgot-password', async (req: Request, res: Response) => {
+    try {
+      const { email } = req.body;
+      if (!email || typeof email !== 'string') {
+        return res.status(400).json({ message: 'Email wajib diisi.' });
+      }
+      const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0].trim() || req.ip || 'unknown';
+      const userAgent = req.headers['user-agent'];
+      const result = await OTPService.requestOTP({ email: email.trim(), ip, userAgent });
+      return res.status(result.success ? 200 : 429).json(result);
+    } catch (err: any) {
+      console.error('[OTP] forgot-password error:', err.message);
+      return res.status(500).json({ message: 'Terjadi kesalahan sistem. Coba lagi.' });
+    }
+  });
+
+  // POST /api/auth/verify-otp — verify OTP, get reset token
+  app.post('/api/auth/verify-otp', async (req: Request, res: Response) => {
+    try {
+      const { email, otp } = req.body;
+      if (!email || !otp) {
+        return res.status(400).json({ message: 'Email dan kode OTP wajib diisi.' });
+      }
+      const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0].trim() || req.ip || 'unknown';
+      const userAgent = req.headers['user-agent'];
+      const result = await OTPService.verifyOTP({ email: email.trim(), otp: String(otp).trim(), ip, userAgent });
+      return res.status(result.success ? 200 : 400).json(result);
+    } catch (err: any) {
+      console.error('[OTP] verify-otp error:', err.message);
+      return res.status(500).json({ message: 'Terjadi kesalahan sistem. Coba lagi.' });
+    }
+  });
+
+  // POST /api/auth/reset-password — set new password using reset token
+  app.post('/api/auth/reset-password', async (req: Request, res: Response) => {
+    try {
+      const { email, resetToken, newPassword } = req.body;
+      if (!email || !resetToken || !newPassword) {
+        return res.status(400).json({ message: 'Semua field wajib diisi.' });
+      }
+      const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0].trim() || req.ip || 'unknown';
+      const userAgent = req.headers['user-agent'];
+      const result = await OTPService.resetPassword({ email: email.trim(), resetToken, newPassword, ip, userAgent });
+      return res.status(result.success ? 200 : 400).json(result);
+    } catch (err: any) {
+      console.error('[OTP] reset-password error:', err.message);
+      return res.status(500).json({ message: 'Terjadi kesalahan sistem. Coba lagi.' });
+    }
+  });
+
+  // GET /api/auth/security-logs — admin security monitoring (SUPER_ADMIN only)
+  app.get('/api/auth/security-logs', authenticate, authorize([Role.SUPER_ADMIN]), async (req: AuthRequest, res: Response) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 50;
+      const logs = await OTPService.getSecurityLogs(limit);
+      return res.json(logs);
+    } catch (err: any) {
+      return res.status(500).json({ error: 'Gagal memuat log keamanan.' });
+    }
   });
   
   app.get('/api/classes', authenticate, async (req, res) => {
