@@ -37,8 +37,8 @@ import NeuralBackground from '@/components/NeuralBackground';
 
 import StudentModule from '@/components/StudentModule';
 import TeacherModule from '@/components/TeacherModule';
-import IntelligenceDashboard from '@/components/IntelligenceDashboard';
-import StudentAttendancePanel from '@/components/StudentAttendancePanel';
+import MobileStudentPresensi from '@/components/MobileStudentPresensi';
+import MobileGuruPresensi from '@/components/MobileGuruPresensi';
 import AcademicModule from '@/components/AcademicModule';
 import TimetableModule from '@/components/TimetableModule';
 import FinanceModule from '@/components/FinanceModule';
@@ -475,8 +475,8 @@ export default function App() {
 
                 {activeTab === 'presensi' && (
                   user?.role === Role.SISWA
-                    ? <StudentAttendancePanel authToken={token!} />
-                    : <IntelligenceDashboard authToken={token!} />
+                    ? <MobileStudentPresensi authToken={token!} user={user} />
+                    : <MobileGuruPresensi authToken={token!} user={user} />
                 )}
 
                 {activeTab === 'siswa' && <StudentModule authToken={token!} />}
