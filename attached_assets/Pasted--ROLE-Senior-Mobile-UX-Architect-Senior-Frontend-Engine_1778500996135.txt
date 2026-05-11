@@ -1,0 +1,426 @@
+# ROLE:
+Senior Mobile UX Architect, Senior Frontend Engineer, Senior Educational ERP Designer, and Human-Centered Interface Specialist.
+
+# TASK:
+Redesign the entire OSDAI mobile experience to become:
+- ultra user-friendly
+- fast-access
+- minimal scrolling
+- touch optimized
+- operationally efficient
+- school-friendly
+- clean and futuristic
+
+# MANDATE:
+Every module must be quickly accessible.
+Every important action must have visible buttons.
+Minimize vertical scrolling.
+Maximize usability for mobile phone users.
+All buttons must function correctly.
+No hidden features.
+No confusing navigation.
+No empty pages.
+No desktop-style layout forced into mobile.
+
+====================================================
+1. CORE MOBILE UX PRINCIPLE
+====================================================
+
+SYSTEM MUST FEEL:
+- like a modern banking app
+- like a premium super app
+- simple but powerful
+- fast for teachers and students
+- operationally efficient
+
+====================================================
+2. MOBILE-FIRST DESIGN
+====================================================
+
+DO NOT:
+adapt desktop UI into mobile.
+
+INSTEAD:
+design specifically for smartphone interaction.
+
+====================================================
+3. GLOBAL MOBILE LAYOUT
+====================================================
+
+STRUCTURE:
+----------------------------------------------------
+
+TOP:
+- Compact Smart Header
+- Current User
+- Current Session
+- Notification Bell
+- Quick Search
+
+CENTER:
+- Action Cards
+- Live Widgets
+- Smart Shortcuts
+
+BOTTOM:
+- Floating Navigation Bar
+
+====================================================
+4. VERY IMPORTANT RULE
+====================================================
+
+MINIMIZE SCROLLING.
+
+Avoid:
+- long vertical pages
+- giant tables
+- oversized cards
+- unnecessary spacing
+
+====================================================
+5. USE:
+====================================================
+
+- compact card system
+- collapsible sections
+- swipe navigation
+- tabbed modules
+- horizontal scroll chips
+- floating action buttons
+
+====================================================
+6. MOBILE NAVIGATION SYSTEM
+====================================================
+
+CREATE:
+BOTTOM NAVIGATION BAR.
+
+====================================================
+BOTTOM NAVIGATION MENU
+====================================================
+
+1. Beranda
+2. Presensi
+3. Jadwal
+4. Laporan
+5. Akun
+
+====================================================
+RULES
+====================================================
+
+- always visible
+- thumb-friendly
+- glowing active icon
+- soft animation
+- realtime badge notification
+
+====================================================
+7. QUICK ACTION SYSTEM
+====================================================
+
+VERY IMPORTANT.
+
+On every dashboard:
+show QUICK ACTION buttons.
+
+====================================================
+EXAMPLE — DASHBOARD GURU
+====================================================
+
+DISPLAY:
+----------------------------------------------------
+
+[ Aktifkan Presensi ]
+[ Tutup Presensi ]
+[ Lihat Jadwal ]
+[ Rekap Hari Ini ]
+
+----------------------------------------------------
+
+No hidden menu.
+
+====================================================
+EXAMPLE — DASHBOARD SISWA
+====================================================
+
+DISPLAY:
+----------------------------------------------------
+
+[ Respon Presensi ]
+[ Jadwal Hari Ini ]
+[ Riwayat Kehadiran ]
+[ Tugas Aktif ]
+
+====================================================
+EXAMPLE — KEPALA SEKOLAH
+====================================================
+
+DISPLAY:
+----------------------------------------------------
+
+[ Monitor Kelas ]
+[ Guru Aktif ]
+[ Statistik Sekolah ]
+[ Audit Kehadiran ]
+
+====================================================
+8. SMART MODULE DISPLAY
+====================================================
+
+ONLY SHOW:
+modules related to selected menu.
+
+DO NOT:
+mix unrelated widgets.
+
+====================================================
+EXAMPLE
+====================================================
+
+IF USER OPENS:
+"PRESENSI"
+
+ONLY SHOW:
+- attendance controls
+- attendance analytics
+- attendance logs
+- attendance charts
+
+HIDE:
+- inventory
+- finance
+- surat
+- unrelated systems
+
+====================================================
+9. MOBILE DASHBOARD COMPOSITION
+====================================================
+
+EVERY SCREEN MUST HAVE:
+
+----------------------------------------------------
+TOP AREA
+----------------------------------------------------
+
+- compact metrics
+- quick status
+- active session
+
+----------------------------------------------------
+MIDDLE AREA
+----------------------------------------------------
+
+- action buttons
+- live information
+- mini analytics
+
+----------------------------------------------------
+BOTTOM AREA
+----------------------------------------------------
+
+- recent activity
+- notifications
+- quick logs
+
+====================================================
+10. COMPACT DATA SYSTEM
+====================================================
+
+Instead of giant tables:
+use:
+- compact list cards
+- expandable rows
+- mini detail popup
+
+====================================================
+11. RESPONSIVE TABLE SOLUTION
+====================================================
+
+FOR MOBILE:
+convert tables into:
+accordion cards.
+
+EXAMPLE:
+----------------------------------------------------
+
+Nama:
+Andi Pratama
+
+Status:
+Hadir
+
+Jam:
+07:01
+
+[ Detail ]
+
+====================================================
+12. FLOATING ACTION BUTTON
+====================================================
+
+ADD:
+smart floating buttons.
+
+====================================================
+EXAMPLE
+====================================================
+
+Guru:
+floating orange button:
+"+ Buka Presensi"
+
+Admin:
+"+ Tambah Data"
+
+Kepsek:
+"+ Lihat Audit"
+
+====================================================
+13. TOUCH OPTIMIZATION
+====================================================
+
+ALL BUTTONS MUST:
+- large enough
+- spaced correctly
+- easy to tap
+- not too close
+
+====================================================
+14. MOBILE ANIMATION SYSTEM
+====================================================
+
+ADD:
+- smooth transition
+- soft pulse
+- floating glow
+- swipe animation
+- neural motion
+
+BUT:
+animations must remain lightweight.
+
+====================================================
+15. PERFORMANCE OPTIMIZATION
+====================================================
+
+MOBILE PERFORMANCE IS PRIORITY.
+
+====================================================
+MANDATORY:
+====================================================
+
+- lazy loading
+- optimized rendering
+- lightweight animation
+- compressed assets
+- no lag scrolling
+- no FPS drop
+
+====================================================
+16. MOBILE PRESENSI EXPERIENCE
+====================================================
+
+WHEN STUDENT OPEN APP:
+show immediately:
+
+----------------------------------------------------
+
+Status Presensi Hari Ini:
+BELUM HADIR
+
+Mapel Saat Ini:
+Matematika
+
+Guru:
+Budi Santoso
+
+[ RESPON PRESENSI ]
+
+----------------------------------------------------
+
+No extra navigation needed.
+
+====================================================
+17. GURU LIVE PRESENSI
+====================================================
+
+Teacher dashboard must instantly show:
+----------------------------------------------------
+
+- jumlah hadir
+- siswa terlambat
+- siswa pending validation
+- live confirmation
+
+with:
+NO REFRESH.
+
+====================================================
+18. SMART COLLAPSIBLE UI
+====================================================
+
+USE:
+expandable modules.
+
+Example:
+----------------------------------------------------
+
+▶ Statistik Kehadiran
+▶ Jadwal Hari Ini
+▶ Aktivitas Terbaru
+
+User taps to expand.
+
+====================================================
+19. EMPTY SPACE ELIMINATION
+====================================================
+
+STRICTLY REMOVE:
+- giant paddings
+- huge margins
+- oversized banners
+- useless whitespace
+
+EVERY SCREEN:
+must feel alive and informative.
+
+====================================================
+20. FINAL MOBILE EXECUTION
+====================================================
+
+BUILD:
+- ultra compact mobile UI
+- minimal scrolling system
+- thumb-friendly navigation
+- realtime quick access
+- action-first interaction
+- operational mobile dashboard
+
+VERIFY:
+- all buttons work
+- no dead click
+- no hidden feature
+- no blank modules
+- no broken layout
+- no horizontal overflow
+- no mobile lag
+
+====================================================
+FINAL RESULT MUST FEEL LIKE:
+====================================================
+
+A premium futuristic AI-powered school super app
+specifically designed for:
+- teachers
+- students
+- principals
+- school operations
+
+with:
+- minimal scrolling
+- maximum usability
+- elegant mobile experience
+- responsive AI ecosystem
+
+EXECUTE IMMEDIATELY.

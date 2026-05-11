@@ -1,54 +1,37 @@
 import { useState, useEffect } from 'react';
 import { Role } from '@prisma/client';
 import { motion, AnimatePresence } from 'motion/react';
-import {
-  Users,
-  GraduationCap,
-  DollarSign,
-  BarChart3,
-  ShieldCheck,
-  BrainCircuit,
-  Loader2,
-  Lock,
-  LogOut,
-  Briefcase,
-  FileText,
-  Archive,
-  Zap,
-  School,
-  BookOpen,
-  Radio,
-  ChevronRight,
-  Sparkles,
-  Navigation,
-  Activity,
-  Eye,
-  Send,
-  MessageSquare,
-  MoreHorizontal,
-} from 'lucide-react';
+import { BrainCircuit, Lock, Loader2 } from 'lucide-react';
 
+import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import NeuralBackground from '@/components/NeuralBackground';
 
-import StudentModule from '@/components/StudentModule';
-import TeacherModule from '@/components/TeacherModule';
+import MobileBottomNav, { MobileTab } from '@/components/MobileBottomNav';
+import MobileHeader from '@/components/MobileHeader';
+import AkunScreen from '@/components/AkunScreen';
+import GuruDashboard from '@/components/dashboards/GuruDashboard';
+import SiswaDashboard from '@/components/dashboards/SiswaDashboard';
+import KepsekDashboard from '@/components/dashboards/KepsekDashboard';
+import AdminDashboard from '@/components/dashboards/AdminDashboard';
+import LaporanScreen from '@/components/LaporanScreen';
+import JadwalScreen from '@/components/JadwalScreen';
+
 import MobileStudentPresensi from '@/components/MobileStudentPresensi';
 import MobileGuruPresensi from '@/components/MobileGuruPresensi';
-import AcademicModule from '@/components/AcademicModule';
-import TimetableModule from '@/components/TimetableModule';
-import FinanceModule from '@/components/FinanceModule';
-import LMSModule from '@/components/LMSModule';
-import AIAnalyticsModule from '@/components/AIAnalyticsModule';
 import PusatMonitoringKepsek from '@/components/PusatMonitoringKepsek';
+import StudentModule from '@/components/StudentModule';
+import TeacherModule from '@/components/TeacherModule';
+import FinanceModule from '@/components/FinanceModule';
 import ArchiveModule from '@/components/ArchiveModule';
 import SuratModule from '@/components/SuratModule';
+import AIAnalyticsModule from '@/components/AIAnalyticsModule';
+import LMSModule from '@/components/LMSModule';
 
-// OSDAI Logo / Branding Icon
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
 const OsdaiIcon = ({ size = 24 }: { size?: number }) => (
   <div className="relative flex items-center justify-center">
     <BrainCircuit size={size} className="text-white" />
@@ -60,57 +43,38 @@ const OsdaiIcon = ({ size = 24 }: { size?: number }) => (
   </div>
 );
 
-// Role label mapping
-const roleLabel: Record<string, string> = {
-  SUPER_ADMIN: 'Super Administrator',
-  TU: 'Tata Usaha',
-  KEPALA_SEKOLAH: 'Kepala Sekolah',
-  GURU: 'Guru',
-  SISWA: 'Siswa',
-  BK: 'Bimbingan Konseling',
-  BENDAHARA: 'Bendahara',
-};
-
-// Navigation items per role
-const getNavItems = (role: string) => {
-  const all = [
-    { id: 'beranda',     label: 'Beranda Sistem',          icon: BarChart3,      roles: ['SUPER_ADMIN', 'TU', 'KEPALA_SEKOLAH'] },
-    { id: 'monitoring',  label: 'Ruang Kendali',           icon: Eye,            roles: ['KEPALA_SEKOLAH', 'SUPER_ADMIN'] },
-    { id: 'presensi',    label: 'Sistem Presensi Cerdas',  icon: Radio,          roles: ['GURU', 'SISWA', 'SUPER_ADMIN', 'TU'] },
-    { id: 'lms',         label: 'Ruang Belajar Digital',   icon: BookOpen,       roles: ['GURU', 'SISWA', 'SUPER_ADMIN'] },
-    { id: 'siswa',       label: 'Manajemen Siswa',         icon: Users,          roles: ['SUPER_ADMIN', 'TU', 'KEPALA_SEKOLAH'] },
-    { id: 'guru',        label: 'Manajemen Guru',          icon: GraduationCap,  roles: ['SUPER_ADMIN', 'TU', 'KEPALA_SEKOLAH'] },
-    { id: 'keuangan',    label: 'Keuangan & SPP',          icon: DollarSign,     roles: ['SUPER_ADMIN', 'TU', 'BENDAHARA'] },
-    { id: 'jadwal',      label: 'Jadwal Pelajaran',        icon: MessageSquare,  roles: ['SUPER_ADMIN', 'TU', 'KEPALA_SEKOLAH', 'GURU'] },
-    { id: 'arsip',       label: 'Arsip Digital',           icon: Archive,        roles: ['SUPER_ADMIN', 'TU'] },
-    { id: 'surat',       label: 'Pusat Surat Digital',     icon: FileText,       roles: ['SUPER_ADMIN', 'TU', 'KEPALA_SEKOLAH'] },
-    { id: 'analitik',   label: 'Analitik Pembelajaran',   icon: Sparkles,       roles: ['SUPER_ADMIN', 'KEPALA_SEKOLAH', 'BK'] },
-  ];
-  return all.filter(item => item.roles.includes(role));
-};
-
-// Default tab per role
-const defaultTab = (role: string) => {
-  if (role === 'SISWA') return 'presensi';
-  if (role === 'GURU') return 'presensi';
-  if (role === 'KEPALA_SEKOLAH') return 'monitoring';
+const defaultTab = (role: string): MobileTab => {
+  if (role === 'GURU') return 'beranda';
+  if (role === 'SISWA') return 'beranda';
+  if (role === 'KEPALA_SEKOLAH') return 'beranda';
   return 'beranda';
 };
 
+// Roles that map to the admin-style dashboard
+const ADMIN_ROLES = ['SUPER_ADMIN', 'TU', 'BK', 'BENDAHARA'];
+
+// Map internal tab IDs to MobileTab for navigate-from-dashboard calls
+function toMobileTab(tab: string): MobileTab {
+  if (tab === 'laporan' || tab === 'analitik' || tab === 'keuangan' || tab === 'arsip' || tab === 'surat' || tab === 'lms') return 'laporan';
+  if (tab === 'jadwal') return 'jadwal';
+  if (tab === 'presensi') return 'presensi';
+  if (tab === 'monitoring') return 'beranda'; // kepsek monitoring lives in beranda
+  if (tab === 'siswa' || tab === 'guru') return 'beranda';
+  return 'beranda';
+}
+
+// ── App ────────────────────────────────────────────────────────────────────────
+
 export default function App() {
-  const [activeTab, setActiveTab] = useState('beranda');
+  const [activeTab, setActiveTab] = useState<MobileTab>('beranda');
   const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
   const [user, setUser] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [loginError, setLoginError] = useState('');
-
-  // Announcement form state
-  const [annTitle, setAnnTitle] = useState('');
-  const [annTargets, setAnnTargets] = useState<string[]>([]);
-  const [annSending, setAnnSending] = useState(false);
-  const [annSent, setAnnSent] = useState(false);
+  // For admin beranda sub-navigation (siswa/guru modules)
+  const [adminSubPage, setAdminSubPage] = useState<string | null>(null);
 
   useEffect(() => {
     if (token) checkAuth();
@@ -119,7 +83,7 @@ export default function App() {
 
   const checkAuth = async () => {
     try {
-      const res = await fetch('/api/auth/me', { headers: { 'Authorization': `Bearer ${token}` } });
+      const res = await fetch('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } });
       if (res.ok) {
         const userData = await res.json();
         setUser(userData);
@@ -165,15 +129,24 @@ export default function App() {
     setToken(null);
     localStorage.removeItem('token');
     setActiveTab('beranda');
+    setAdminSubPage(null);
   };
 
-  // ── LOGIN SCREEN ──────────────────────────────────────────────────────────
-  if (!token || authLoading && !user) {
+  const navigate = (tab: string) => {
+    // Handle special admin sub-pages
+    if (tab === 'siswa') { setAdminSubPage('siswa'); setActiveTab('beranda'); return; }
+    if (tab === 'guru') { setAdminSubPage('guru'); setActiveTab('beranda'); return; }
+    if (tab === 'monitoring') { setAdminSubPage('monitoring'); setActiveTab('beranda'); return; }
+    setAdminSubPage(null);
+    setActiveTab(toMobileTab(tab));
+  };
+
+  // ── LOGIN SCREEN ─────────────────────────────────────────────────────────────
+
+  if (!token || (authLoading && !user)) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden">
         <NeuralBackground />
-
-        {/* Floating top badge */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -197,18 +170,15 @@ export default function App() {
           className="w-full max-w-md"
         >
           <GlassPanel className="overflow-hidden bg-white/45 border-white/60 shadow-2xl">
-            {/* Brand Header */}
             <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-10 text-white text-center relative overflow-hidden">
-              {/* Background glow */}
               <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_-20%,rgba(255,106,0,0.3),transparent_70%)]" />
-              {/* Neural grid lines */}
-              <div className="absolute inset-0 opacity-5"
+              <div
+                className="absolute inset-0 opacity-5"
                 style={{
                   backgroundImage: 'linear-gradient(rgba(255,255,255,0.15) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.15) 1px, transparent 1px)',
-                  backgroundSize: '32px 32px'
+                  backgroundSize: '32px 32px',
                 }}
               />
-
               <div className="relative z-10">
                 <motion.div
                   animate={{ boxShadow: ['0 0 0px rgba(255,106,0,0.5)', '0 0 30px rgba(255,106,0,0.8)', '0 0 0px rgba(255,106,0,0.5)'] }}
@@ -285,15 +255,13 @@ export default function App() {
                 </Button>
               </form>
 
-              {/* Quick-fill test accounts */}
               <div className="mt-6 pt-5 border-t border-white/20">
                 <p className="text-center text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3">Akun Test</p>
                 <div className="grid grid-cols-2 gap-2">
                   {[
-                    { label: 'Super Admin', email: 'superadmin@osdai.id', pass: 'osdai123' },
-                    { label: 'Kepala Sekolah', email: 'kepsek@smkn1wonogiri.id', pass: 'wonogiri123' },
-                    { label: 'Guru AKL', email: 'guru.akl@smkn1wonogiri.id', pass: 'guru123' },
-                    { label: 'Siswa AKL', email: 'siswa.akl1@smkn1wonogiri.id', pass: 'siswa123' },
+                    { label: 'Super Admin', email: 'admin@smk.id', pass: 'password123' },
+                    { label: 'Guru', email: 'guru@smk.id', pass: 'password123' },
+                    { label: 'Siswa', email: 'siswa@smk.id', pass: 'password123' },
                   ].map(acc => (
                     <button
                       key={acc.email}
@@ -319,338 +287,160 @@ export default function App() {
     );
   }
 
-  // ── MAIN APP ──────────────────────────────────────────────────────────────
-  const navItems = getNavItems(user?.role || 'GURU');
-  const initials = (user?.name || 'U').split(' ').slice(0, 2).map((w: string) => w[0]).join('').toUpperCase();
+  // ── MAIN APP ─────────────────────────────────────────────────────────────────
+
+  const role = user?.role || 'GURU';
+  const isGuru = role === 'GURU';
+  const isSiswa = role === 'SISWA';
+  const isKepsek = role === 'KEPALA_SEKOLAH';
+  const isAdmin = ADMIN_ROLES.includes(role);
+
+  // Resolve what to show on "beranda" based on role and sub-page
+  const renderBeranda = () => {
+    // Admin special sub-pages
+    if (adminSubPage === 'siswa') return <div className="flex-1 overflow-y-auto pb-24 px-3 pt-2"><StudentModule authToken={token!} /></div>;
+    if (adminSubPage === 'guru') return <div className="flex-1 overflow-y-auto pb-24 px-3 pt-2"><TeacherModule authToken={token!} /></div>;
+    if (adminSubPage === 'monitoring') return <div className="flex-1 overflow-y-auto pb-24 px-3 pt-2"><PusatMonitoringKepsek authToken={token!} /></div>;
+
+    if (isGuru) return <GuruDashboard authToken={token!} user={user} onNavigate={navigate} />;
+    if (isSiswa) return <SiswaDashboard authToken={token!} user={user} onNavigate={navigate} />;
+    if (isKepsek) return <KepsekDashboard authToken={token!} user={user} onNavigate={navigate} />;
+    if (isAdmin) return <AdminDashboard authToken={token!} user={user} role={role} onNavigate={navigate} />;
+    return <AdminDashboard authToken={token!} user={user} role={role} onNavigate={navigate} />;
+  };
+
+  const renderPresensi = () => {
+    if (isSiswa) return <MobileStudentPresensi authToken={token!} user={user} />;
+    if (isKepsek) return (
+      <div className="flex-1 overflow-y-auto pb-24 px-3 pt-2">
+        <PusatMonitoringKepsek authToken={token!} />
+      </div>
+    );
+    return <MobileGuruPresensi authToken={token!} user={user} />;
+  };
+
+  const pageTitle = (() => {
+    if (adminSubPage === 'siswa') return 'Manajemen Siswa';
+    if (adminSubPage === 'guru') return 'Manajemen Guru';
+    if (adminSubPage === 'monitoring') return 'Ruang Kendali';
+    if (activeTab === 'beranda') {
+      if (isKepsek) return 'Ruang Kepala';
+      if (isGuru) return 'Beranda Guru';
+      if (isSiswa) return 'Beranda Siswa';
+      return 'Beranda';
+    }
+    if (activeTab === 'presensi') return 'Presensi';
+    if (activeTab === 'jadwal') return 'Jadwal';
+    if (activeTab === 'laporan') return 'Laporan';
+    if (activeTab === 'akun') return 'Akun Saya';
+    return 'OSDAI';
+  })();
+
+  // Badge counts (can be extended with real data)
+  const badges: Partial<Record<MobileTab, number>> = {};
 
   return (
-    <div className="min-h-screen p-4 lg:p-8 flex flex-col lg:flex-row gap-5 relative overflow-hidden h-screen overflow-y-auto">
-      <NeuralBackground />
+    <div
+      className="flex flex-col h-screen overflow-hidden"
+      style={{ background: '#1C100A', maxWidth: 480, margin: '0 auto', position: 'relative' }}
+    >
+      {/* Fixed Header */}
+      <MobileHeader
+        user={user}
+        title={pageTitle}
+        onNotif={() => {}}
+        onSearch={activeTab !== 'akun' ? () => {} : undefined}
+      />
 
-      {/* ── LEFT SIDEBAR ── */}
-      <div className="lg:w-[280px] xl:w-[300px] flex flex-col gap-5 shrink-0 h-full">
-        <GlassPanel className="flex-1 flex flex-col p-6 overflow-hidden">
-
-          {/* Brand Header */}
-          <div className="flex items-center gap-3 mb-8 px-1">
-            <motion.div
-              animate={{ boxShadow: ['0 0 0px rgba(255,106,0,0.3)', '0 0 16px rgba(255,106,0,0.7)', '0 0 0px rgba(255,106,0,0.3)'] }}
-              transition={{ duration: 3, repeat: Infinity }}
-              className="w-11 h-11 bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl flex items-center justify-center text-white shadow-lg shrink-0"
-            >
-              <OsdaiIcon size={22} />
-            </motion.div>
-            <div className="min-w-0">
-              <h2 className="text-lg font-black text-slate-900 leading-tight">OSDAI</h2>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <motion.div
-                  animate={{ opacity: [1, 0.4, 1] }}
-                  transition={{ duration: 1.8, repeat: Infinity }}
-                  className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_6px_rgba(34,197,94,0.6)]"
-                />
-                <p className="text-[9px] uppercase font-black tracking-[0.2em] text-slate-400 truncate">Sistem Aktif</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Navigation */}
-          <nav className="space-y-1 flex-1 overflow-y-auto">
-            {navItems.map((item) => {
-              const isActive = activeTab === item.id;
-              return (
-                <motion.button
-                  key={item.id}
-                  whileHover={{ x: 2 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => setActiveTab(item.id)}
-                  className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-[18px] transition-all duration-200 group text-left ${
-                    isActive
-                      ? 'bg-slate-900 text-white shadow-lg'
-                      : 'text-slate-500 hover:bg-white/50 hover:text-slate-800'
-                  }`}
-                >
-                  <div className={`shrink-0 ${isActive ? 'text-orange-400' : 'text-slate-400 group-hover:text-orange-400 transition-colors'}`}>
-                    <item.icon size={17} />
-                  </div>
-                  <span className="text-[11px] font-black tracking-tight flex-1">{item.label}</span>
-                  {isActive && <ChevronRight size={12} className="text-white/40 shrink-0" />}
-                </motion.button>
-              );
-            })}
-          </nav>
-
-          {/* GPS Status */}
-          <div className="mt-6 p-4 bg-white/30 rounded-[20px] border border-white/50">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Inti Neural OSDAI</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Navigation size={13} className="text-blue-500" />
-              <span className="text-[10px] font-black text-slate-700">Integritas GPS Aktif</span>
-            </div>
-            <div className="flex items-center gap-2 mt-1.5">
-              <ShieldCheck size={13} className="text-green-500" />
-              <span className="text-[10px] font-black text-slate-700">Audit Log Berjalan</span>
-            </div>
-          </div>
-
-          {/* User Info & Logout */}
-          <div className="mt-4 pt-4 border-t border-white/20 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white font-black text-xs shrink-0 shadow-md">
-                {initials}
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs font-black text-slate-900 truncate">{user?.name || '—'}</p>
-                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest truncate">
-                  {roleLabel[user?.role] || user?.role}
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={handleLogout}
-              className="p-2 rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all"
-              title="Keluar dari Sistem"
-            >
-              <LogOut size={15} />
-            </button>
-          </div>
-        </GlassPanel>
-      </div>
-
-      {/* ── CENTER MAIN PANEL ── */}
-      <div className="flex-1 flex flex-col min-w-0 h-full">
-        <GlassPanel className="flex flex-col h-full bg-white/25 overflow-hidden">
-
-          {/* Top Header */}
-          <header className="flex items-center justify-between mb-8 shrink-0">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <h1 className="text-2xl lg:text-3xl font-black text-slate-900 tracking-tight">
-                  {navItems.find(n => n.id === activeTab)?.label || 'Beranda Sistem'}
-                </h1>
-                {activeTab === 'monitoring' && (
-                  <motion.div
-                    animate={{ opacity: [1, 0.3, 1] }}
-                    transition={{ duration: 1.5, repeat: Infinity }}
-                    className="flex items-center gap-1 px-2.5 py-0.5 bg-green-500/10 border border-green-500/30 rounded-full"
-                  >
-                    <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                    <span className="text-[9px] font-black text-green-600 uppercase tracking-widest">Live</span>
-                  </motion.div>
-                )}
-              </div>
-              <p className="text-xs font-bold text-slate-400">
-                OSDAI · Otomatisasi Sekolah Digital Berbasis Artificial Intelligent
-              </p>
-            </div>
-
-            {/* School info badge */}
-            <div className="hidden md:flex items-center gap-2 px-4 py-2 bg-white/40 border border-white/60 rounded-2xl">
-              <School size={14} className="text-orange-500" />
-              <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">SMK Negeri 1 Wonogiri</span>
-            </div>
-          </header>
-
-          {/* Scrollable Content */}
-          <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={activeTab}
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-                transition={{ duration: 0.2, ease: 'easeOut' }}
-              >
-                {activeTab === 'beranda' && (
-                  <div className="space-y-8 pb-20">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                      <GlassPanel
-                        hoverScale
-                        className="bg-white/40 border-white/60 p-8 cursor-pointer group"
-                        onClick={() => setActiveTab('siswa')}
-                      >
-                        <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center mb-5">
-                          <Users className="text-blue-500" size={24} />
-                        </div>
-                        <h3 className="text-xl font-black mb-2 text-slate-900">Manajemen Siswa</h3>
-                        <p className="text-sm font-bold text-slate-400">Registri data NISN/NIS, riwayat akademik, dan rekap kehadiran.</p>
-                        <div className="mt-5 flex items-center gap-1.5 text-orange-500">
-                          <span className="text-[10px] font-black uppercase tracking-widest">Buka Modul</span>
-                          <ChevronRight size={12} />
-                        </div>
-                      </GlassPanel>
-
-                      <GlassPanel
-                        hoverScale
-                        className="bg-white/40 border-white/60 p-8 cursor-pointer group"
-                        onClick={() => setActiveTab('guru')}
-                      >
-                        <div className="w-12 h-12 bg-orange-50 rounded-2xl flex items-center justify-center mb-5">
-                          <BookOpen className="text-orange-500" size={24} />
-                        </div>
-                        <h3 className="text-xl font-black mb-2 text-slate-900">Manajemen Guru</h3>
-                        <p className="text-sm font-bold text-slate-400">Database profesional pendidik, jam mengajar, dan sertifikasi.</p>
-                        <div className="mt-5 flex items-center gap-1.5 text-orange-500">
-                          <span className="text-[10px] font-black uppercase tracking-widest">Buka Modul</span>
-                          <ChevronRight size={12} />
-                        </div>
-                      </GlassPanel>
-                    </div>
-
-                    <AIAnalyticsModule authToken={token!} />
-                  </div>
-                )}
-
-                {activeTab === 'monitoring' && (
-                  <PusatMonitoringKepsek authToken={token!} />
-                )}
-
-                {activeTab === 'presensi' && (
-                  user?.role === Role.SISWA
-                    ? <MobileStudentPresensi authToken={token!} user={user} />
-                    : <MobileGuruPresensi authToken={token!} user={user} />
-                )}
-
-                {activeTab === 'lms' && <LMSModule authToken={token!} userRole={user?.role} />}
-                {activeTab === 'siswa' && <StudentModule authToken={token!} />}
-                {activeTab === 'guru' && <TeacherModule authToken={token!} />}
-                {activeTab === 'keuangan' && <FinanceModule authToken={token!} userRole={user?.role} />}
-                {activeTab === 'jadwal' && <TimetableModule authToken={token!} />}
-                {activeTab === 'analitik' && <AIAnalyticsModule authToken={token!} />}
-
-                {activeTab === 'arsip' && <ArchiveModule authToken={token!} />}
-
-                {activeTab === 'surat' && <SuratModule authToken={token!} />}
-              </motion.div>
-            </AnimatePresence>
-          </div>
-        </GlassPanel>
-      </div>
-
-      {/* ── RIGHT PANEL ── */}
-      <div className="lg:w-[340px] xl:w-[380px] shrink-0 flex flex-col gap-5 h-full">
-
-        {/* Pengumuman */}
-        <GlassPanel className="bg-white/20 border-white/40 relative overflow-hidden">
-          <div className="absolute -top-8 -right-8 w-40 h-40 bg-orange-400 rounded-full blur-[80px] opacity-15 pointer-events-none" />
-
+      {/* Scrollable Content Area */}
+      <div className="flex-1 flex flex-col overflow-hidden relative">
+        <AnimatePresence mode="wait">
           <motion.div
-            animate={{ y: [0, -8, 0] }}
-            transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
-            className="relative z-10 flex items-center justify-center mb-8"
+            key={`${activeTab}-${adminSubPage || ''}`}
+            initial={{ opacity: 0, x: 12 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -12 }}
+            transition={{ duration: 0.18, ease: 'easeOut' }}
+            className="flex-1 flex flex-col overflow-hidden h-full"
           >
-            <div className="w-36 h-36 bg-white/20 backdrop-blur-3xl rounded-[32px] border border-white/50 rotate-12 flex items-center justify-center shadow-2xl">
-              <Zap size={56} className="text-[#FF6A00] drop-shadow-[0_0_12px_rgba(255,106,0,0.5)]" />
-            </div>
+            {activeTab === 'beranda' && renderBeranda()}
+            {activeTab === 'presensi' && renderPresensi()}
+            {activeTab === 'jadwal' && <JadwalScreen authToken={token!} role={role} />}
+            {activeTab === 'laporan' && <LaporanScreen authToken={token!} role={role} />}
+            {activeTab === 'akun' && <AkunScreen user={user} onLogout={handleLogout} />}
           </motion.div>
-
-          <div className="space-y-5 relative z-10">
-            <div>
-              <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.4em] mb-1">KOMUNIKASI SEKOLAH</p>
-              <h2 className="text-2xl font-black text-slate-900 tracking-tight uppercase">Kirim Pengumuman</h2>
-            </div>
-            <p className="text-xs font-bold text-slate-500 leading-relaxed">
-              Buat dan siarkan pengumuman secara instan ke seluruh sivitas sekolah.
-            </p>
-            {annSent ? (
-              <div className="flex flex-col items-center gap-3 py-4">
-                <div className="w-12 h-12 rounded-2xl bg-green-100 flex items-center justify-center">
-                  <Radio size={22} className="text-green-600" />
-                </div>
-                <p className="text-sm font-black text-green-700">Pengumuman Terkirim!</p>
-                <button
-                  onClick={() => { setAnnSent(false); setAnnTitle(''); setAnnTargets([]); }}
-                  className="text-[10px] font-black text-slate-400 hover:text-slate-700 uppercase tracking-widest underline"
-                >
-                  Buat Lagi
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-3 pt-2">
-                <div>
-                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Judul Pengumuman</p>
-                  <Input
-                    value={annTitle}
-                    onChange={e => setAnnTitle(e.target.value)}
-                    placeholder="Tulis judul di sini..."
-                    className="h-12 rounded-2xl bg-white/40 border-white/60 font-bold placeholder:text-slate-400 text-sm"
-                  />
-                </div>
-                <div>
-                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Tujuan</p>
-                  <div className="flex flex-wrap gap-2">
-                    {['Admin', 'Waka', 'Guru', 'Siswa'].map(r => {
-                      const active = annTargets.includes(r);
-                      return (
-                        <button
-                          key={r}
-                          onClick={() => setAnnTargets(prev => active ? prev.filter(t => t !== r) : [...prev, r])}
-                          className={`px-4 py-1.5 rounded-full border text-[10px] font-black uppercase transition-all duration-200 ${
-                            active
-                              ? 'bg-slate-900 text-white border-slate-900'
-                              : 'border-white/60 bg-white/20 text-slate-600 hover:bg-slate-900 hover:text-white'
-                          }`}
-                        >
-                          {r}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-                <Button
-                  className="w-full h-12 rounded-2xl bg-slate-900 text-white font-black flex items-center justify-center gap-2 shadow-xl mt-3 disabled:opacity-50"
-                  disabled={!annTitle.trim() || annSending}
-                  onClick={async () => {
-                    if (!annTitle.trim() || !token) return;
-                    setAnnSending(true);
-                    try {
-                      await fetch('/api/announcements', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                        body: JSON.stringify({ title: annTitle, targets: annTargets })
-                      });
-                      setAnnSent(true);
-                    } catch { /* ignore */ }
-                    finally { setAnnSending(false); }
-                  }}
-                >
-                  {annSending ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
-                  {annSending ? 'Mengirim...' : 'SIARAN KE SEMUA'}
-                </Button>
-              </div>
-            )}
-          </div>
-        </GlassPanel>
-
-        {/* Quick Tools */}
-        <GlassPanel className="bg-white/15 border-white/20 p-6">
-          <div className="flex items-center justify-between mb-5">
-            <div className="flex items-center gap-2">
-              <Activity size={16} className="text-slate-500" />
-              <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Akses Cepat</span>
-            </div>
-            <button className="text-slate-400"><MoreHorizontal size={16} /></button>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            {[
-              { label: 'Cek GPS', icon: Navigation, action: () => window.open('https://maps.google.com/?q=SMK+Negeri+1+Wonogiri', '_blank') },
-              { label: 'Cetak QR', icon: ShieldCheck, action: () => window.open(`/api/timetable/export/pdf?classId=all`, '_blank') },
-              { label: 'Laporan Hari Ini', icon: BarChart3, action: () => setActiveTab('analitik') },
-              { label: 'Arsip Digital', icon: Archive, action: () => setActiveTab('arsip') },
-            ].map(({ label, icon: Icon, action }) => (
-              <button
-                key={label}
-                onClick={action}
-                className="p-4 rounded-[20px] bg-white/30 border border-white/50 text-[10px] font-black text-slate-600 hover:bg-[#FF6A00] hover:text-white hover:border-[#FF6A00] transition-all duration-200 flex flex-col items-center gap-2"
-              >
-                <Icon size={16} />
-                {label}
-              </button>
-            ))}
-          </div>
-        </GlassPanel>
+        </AnimatePresence>
       </div>
+
+      {/* Bottom Navigation — always visible */}
+      <MobileBottomNav
+        active={activeTab}
+        onChange={(tab) => {
+          setAdminSubPage(null);
+          setActiveTab(tab);
+        }}
+        badge={badges}
+      />
+
+      {/* Floating Action Button for Guru */}
+      {isGuru && activeTab === 'presensi' && (
+        <motion.div
+          initial={{ scale: 0, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="fixed bottom-24 right-5 z-50"
+        >
+          <motion.button
+            animate={{ boxShadow: ['0 0 0px rgba(255,106,0,0.5)', '0 0 24px rgba(255,106,0,0.8)', '0 0 0px rgba(255,106,0,0.5)'] }}
+            transition={{ duration: 2, repeat: Infinity }}
+            className="w-14 h-14 rounded-2xl flex items-center justify-center font-black text-white text-2xl shadow-2xl"
+            style={{ background: 'linear-gradient(135deg, #FF6A00, #e55a00)' }}
+            title="Buka Presensi Baru"
+            onClick={() => navigate('presensi')}
+          >
+            +
+          </motion.button>
+        </motion.div>
+      )}
+
+      {/* Floating Action Button for Admin: Add Data */}
+      {isAdmin && (activeTab === 'beranda') && !adminSubPage && (
+        <motion.div
+          initial={{ scale: 0, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="fixed bottom-24 right-5 z-50"
+        >
+          <motion.button
+            animate={{ boxShadow: ['0 0 0px rgba(255,106,0,0.4)', '0 0 18px rgba(255,106,0,0.7)', '0 0 0px rgba(255,106,0,0.4)'] }}
+            transition={{ duration: 2.5, repeat: Infinity }}
+            className="w-14 h-14 rounded-2xl flex items-center justify-center font-black text-white text-2xl shadow-2xl"
+            style={{ background: 'linear-gradient(135deg, #FF6A00, #e55a00)' }}
+            title="Tambah Data"
+            onClick={() => navigate('siswa')}
+          >
+            +
+          </motion.button>
+        </motion.div>
+      )}
+
+      {/* Floating Action Button for Kepsek */}
+      {isKepsek && activeTab === 'beranda' && (
+        <motion.div
+          initial={{ scale: 0, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="fixed bottom-24 right-5 z-50"
+        >
+          <motion.button
+            animate={{ boxShadow: ['0 0 0px rgba(124,58,237,0.5)', '0 0 20px rgba(124,58,237,0.7)', '0 0 0px rgba(124,58,237,0.5)'] }}
+            transition={{ duration: 2, repeat: Infinity }}
+            className="w-14 h-14 rounded-2xl flex items-center justify-center font-black text-white text-xl shadow-2xl"
+            style={{ background: 'linear-gradient(135deg, #7c3aed, #6d28d9)' }}
+            title="Lihat Audit"
+            onClick={() => { setAdminSubPage('monitoring'); setActiveTab('beranda'); }}
+          >
+            👁
+          </motion.button>
+        </motion.div>
+      )}
     </div>
   );
 }
