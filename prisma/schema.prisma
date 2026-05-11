@@ -368,12 +368,20 @@ model TimetableVersion {
   semesterId      String?
   versionName     String
   isActive        Boolean  @default(false)
+  source          String   @default("REAL") // DEMO | REAL | UPLOADED
   changelog       String?
   createdBy       String
   createdAt       DateTime @default(now())
   archivedAt      DateTime?
 
   schedules       Schedule[]
+}
+
+model SystemConfig {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
 }
 
 model TimetableConfig {

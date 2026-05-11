@@ -349,6 +349,59 @@ export const TimetableIngestionService = {
     }
   },
 
+  async commitPreflight(uploadId: string, academicYearId: string) {
+    const staging = await prisma.importedScheduleStaging.findMany({
+      where: { uploadId, status: 'MATCHED' },
+      select: { id: true }
+    });
+
+    const activeDemo = await prisma.timetableVersion.findFirst({
+      where: { academicYearId, isActive: true, source: 'DEMO' },
+      select: {
+        id: true,
+        versionName: true,
+        source: true,
+        _count: { select: { schedules: true } }
+      }
+    });
+
+    const activeReal = await prisma.timetableVersion.findFirst({
+      where: { academicYearId, isActive: true, source: { not: 'DEMO' } },
+      select: {
+        id: true,
+        versionName: true,
+        source: true,
+        _count: { select: { schedules: true } }
+      }
+    });
+
+    const totalStudents = activeDemo
+      ? await prisma.student.count({ where: { deletedAt: null } })
+      : 0;
+
+    const totalAttendance = activeDemo
+      ? await prisma.attendance.count()
+      : 0;
+
+    return {
+      incomingRecords: staging.length,
+      activeDemoVersion: activeDemo ? {
+        id: activeDemo.id,
+        versionName: activeDemo.versionName,
+        scheduleCount: activeDemo._count.schedules,
+        studentCount: totalStudents,
+        attendanceCount: totalAttendance,
+      } : null,
+      activeRealVersion: activeReal ? {
+        id: activeReal.id,
+        versionName: activeReal.versionName,
+        scheduleCount: activeReal._count.schedules,
+        source: activeReal.source,
+      } : null,
+      isDemoActive: !!activeDemo,
+    };
+  },
+
   async commitToProduction(uploadId: string, academicYearId: string, userId: string) {
     const staging = await prisma.importedScheduleStaging.findMany({
       where: { uploadId, status: 'MATCHED' },
@@ -362,24 +415,45 @@ export const TimetableIngestionService = {
         throw new Error('Cannot commit: Unresolved critical conflicts detected.');
     }
 
+    // Detect if a DEMO version is currently active (for smart replacement)
+    const activeDemoVersion = await prisma.timetableVersion.findFirst({
+      where: { academicYearId, isActive: true, source: 'DEMO' },
+      select: { id: true, versionName: true }
+    });
+
     return prisma.$transaction(async (tx) => {
-      // 1. Create new version
+      // 1. Create new UPLOADED version (distinct from DEMO and REAL)
       const version = await tx.timetableVersion.create({
         data: {
           academicYearId,
-          versionName: `Import-${new Date().toISOString()}`,
+          versionName: `CSV-Import-${new Date().toISOString().slice(0, 10)}`,
           isActive: true,
+          source: 'UPLOADED',
           createdBy: userId,
         }
       });
 
-      // 2. Archive previous active versions
+      // 2. Archive ALL previous active versions (DEMO and REAL alike)
       await tx.timetableVersion.updateMany({
-        where: { academicYearId, isActive: true, NOT: { id: version.id } },
+        where: { isActive: true, NOT: { id: version.id } },
         data: { isActive: false, archivedAt: new Date() }
       });
 
-      // 3. Insert into Schedule
+      // 3. If a DEMO version was replaced, record this in SystemConfig
+      if (activeDemoVersion) {
+        await tx.systemConfig.upsert({
+          where: { key: 'demo_replaced_at' },
+          update: { value: new Date().toISOString() },
+          create: { key: 'demo_replaced_at', value: new Date().toISOString() }
+        });
+        await tx.systemConfig.upsert({
+          where: { key: 'demo_replaced_by_version' },
+          update: { value: version.id },
+          create: { key: 'demo_replaced_by_version', value: version.id }
+        });
+      }
+
+      // 4. Insert incoming schedules into the new UPLOADED version
       await tx.schedule.createMany({
         data: staging.map(s => ({
           day: s.day,
@@ -394,7 +468,7 @@ export const TimetableIngestionService = {
         }))
       });
 
-      return version;
+      return { version, replacedDemo: !!activeDemoVersion };
     });
   }
 };

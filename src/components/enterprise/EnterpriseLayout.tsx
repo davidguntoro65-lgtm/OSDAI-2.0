@@ -10,6 +10,7 @@ import {
   RefreshCcw, ChevronLeft, User, Globe, AlertTriangle,
   CheckCircle2, Monitor
 } from 'lucide-react';
+import DemoBanner from '@/components/DemoBanner';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 export type EnterpriseModule =
@@ -498,6 +499,9 @@ export default function EnterpriseLayout({ user, authToken, onLogout, onSwitchMo
 
       {/* ── Right side: header + content ── */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+
+        {/* Demo Mode Banner */}
+        <DemoBanner authToken={authToken} />
 
         {/* ── Top Header ── */}
         <header

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Role } from '@prisma/client';
 import { motion, AnimatePresence, useTime, useTransform } from 'motion/react';
 import { BrainCircuit, Lock, Loader2 } from 'lucide-react';
+import DemoBanner from '@/components/DemoBanner';
 import ForgotPasswordScreen from '@/components/ForgotPasswordScreen';
 import ModeSelector from '@/components/enterprise/ModeSelector';
 import AdminEnterprise from '@/components/enterprise/AdminEnterprise';
@@ -432,9 +433,9 @@ export default function App() {
               {/* Test Account Chips */}
               <div className="grid grid-cols-3 gap-2 mb-5">
                 {[
-                  { label: 'Admin', email: 'admin@smk.id', pass: 'password123', color: '#FF6A00' },
-                  { label: 'Guru', email: 'guru@smk.id', pass: 'password123', color: '#f59e0b' },
-                  { label: 'Siswa', email: 'siswa@smk.id', pass: 'password123', color: '#22c55e' },
+                  { label: 'Admin', email: 'superadmin@osdai.id', pass: 'osdai123', color: '#FF6A00' },
+                  { label: 'Guru', email: 'guru.akl@smkn1wonogiri.id', pass: 'guru123', color: '#f59e0b' },
+                  { label: 'Siswa', email: 'siswa.akl01@smkn1wonogiri.id', pass: 'siswa123', color: '#22c55e' },
                 ].map(acc => (
                   <motion.button
                     key={acc.email}
@@ -559,6 +560,9 @@ export default function App() {
       className="flex flex-col h-screen overflow-hidden"
       style={{ background: '#1C100A', maxWidth: 480, margin: '0 auto', position: 'relative' }}
     >
+      {/* Demo Mode Banner */}
+      <DemoBanner authToken={token ?? undefined} />
+
       {/* Fixed Header */}
       <MobileHeader
         user={user}

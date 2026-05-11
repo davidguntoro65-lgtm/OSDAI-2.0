@@ -520,6 +520,18 @@ async function startServer() {
     }
   });
 
+  // Preflight: check if demo version is active before committing a new CSV
+  app.post('/api/timetable/commit/preflight', authenticate, authorize([Role.SUPER_ADMIN, Role.TU]), async (req, res) => {
+    try {
+      const { uploadId, academicYearId } = req.body;
+      if (!uploadId || !academicYearId) return res.status(400).json({ error: 'uploadId and academicYearId required' });
+      const result = await TimetableIngestionService.commitPreflight(uploadId, academicYearId);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.post('/api/timetable/commit', authenticate, authorize([Role.SUPER_ADMIN, Role.TU]), async (req: AuthRequest, res) => {
     try {
       const { uploadId, academicYearId } = req.body;
@@ -1358,6 +1370,153 @@ async function startServer() {
       res.status(500).json({ error: error.message });
     }
   });
+
+  // ─── DEMO MODE API ────────────────────────────────────────────────────────
+
+  /** GET /api/demo/status — public, returns demo mode state */
+  app.get('/api/demo/status', async (_req, res) => {
+    try {
+      const [modeConfig, seededAt, versionId] = await Promise.all([
+        prisma.systemConfig.findUnique({ where: { key: 'DEMO_MODE' } }),
+        prisma.systemConfig.findUnique({ where: { key: 'DEMO_SEEDED_AT' } }),
+        prisma.systemConfig.findUnique({ where: { key: 'DEMO_VERSION_ID' } }),
+      ]);
+
+      const isDemoMode = modeConfig?.value === 'true';
+      const demoVersionId = versionId?.value;
+
+      // Check if any REAL schedule version is active (overrides demo)
+      const realVersion = await prisma.timetableVersion.findFirst({
+        where: { source: 'REAL', isActive: true },
+      });
+
+      const [totalStudents, totalTeachers, totalSchedules] = await Promise.all([
+        prisma.student.count({ where: { status: 'ACTIVE' } }),
+        prisma.teacher.count({ where: { status: 'ACTIVE' } }),
+        demoVersionId ? prisma.schedule.count({ where: { versionId: demoVersionId } }) : Promise.resolve(0),
+      ]);
+
+      res.json({
+        isDemoMode,
+        hasRealSchedule: !!realVersion,
+        seededAt: seededAt?.value || null,
+        totalStudents,
+        totalTeachers,
+        totalSchedules,
+        demoVersionId: demoVersionId || null,
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  /** POST /api/demo/seed — run full demo seeder (idempotent) */
+  app.post('/api/demo/seed', async (_req, res) => {
+    try {
+      const { execFileSync } = await import('child_process');
+      execFileSync(
+        'node_modules/.bin/tsx',
+        ['prisma/seeds/demo.ts'],
+        { stdio: 'pipe', timeout: 120_000 }
+      );
+
+      // Re-fetch status after seed
+      const [seededAt, versionId] = await Promise.all([
+        prisma.systemConfig.findUnique({ where: { key: 'DEMO_SEEDED_AT' } }),
+        prisma.systemConfig.findUnique({ where: { key: 'DEMO_VERSION_ID' } }),
+      ]);
+      const demoVersionId = versionId?.value;
+      const [totalStudents, totalTeachers, totalSchedules] = await Promise.all([
+        prisma.student.count({ where: { status: 'ACTIVE' } }),
+        prisma.teacher.count({ where: { status: 'ACTIVE' } }),
+        demoVersionId ? prisma.schedule.count({ where: { versionId: demoVersionId } }) : Promise.resolve(0),
+      ]);
+
+      res.json({
+        success: true,
+        message: 'Demo data seeded successfully',
+        status: { isDemoMode: true, hasRealSchedule: false, seededAt: seededAt?.value, totalStudents, totalTeachers, totalSchedules },
+      });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message || 'Seeder failed' });
+    }
+  });
+
+  /** DELETE /api/demo/reset-schedule — remove DEMO schedules only (protect real data) */
+  app.delete('/api/demo/reset-schedule', authenticate, authorize([Role.SUPER_ADMIN]), async (_req, res) => {
+    try {
+      const demoVersionConfig = await prisma.systemConfig.findUnique({ where: { key: 'DEMO_VERSION_ID' } });
+      if (!demoVersionConfig?.value) {
+        return res.status(404).json({ error: 'No demo version found' });
+      }
+      const vId = demoVersionConfig.value;
+      // Delete attendance linked to demo schedules
+      const demoSchedules = await prisma.schedule.findMany({ where: { versionId: vId }, select: { id: true } });
+      const sIds = demoSchedules.map(s => s.id);
+      if (sIds.length) {
+        await prisma.attendance.deleteMany({ where: { scheduleId: { in: sIds } } });
+        await prisma.schedule.deleteMany({ where: { versionId: vId } });
+      }
+      await prisma.timetableVersion.update({ where: { id: vId }, data: { isActive: false, archivedAt: new Date() } });
+      await prisma.systemConfig.upsert({
+        where: { key: 'DEMO_MODE' },
+        update: { value: 'false' },
+        create: { key: 'DEMO_MODE', value: 'false' },
+      });
+      res.json({ success: true, message: 'Demo schedule reset. Real data preserved.' });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  /** GET /api/demo/analytics — demo analytics data for dashboards */
+  app.get('/api/demo/analytics', authenticate, async (_req, res) => {
+    try {
+      const demoVersionId = (await prisma.systemConfig.findUnique({ where: { key: 'DEMO_VERSION_ID' } }))?.value;
+
+      const [classes, subjects, attendanceSummary] = await Promise.all([
+        prisma.class.findMany({
+          include: {
+            major: { select: { name: true, code: true } },
+            students: { select: { id: true } },
+            _count: { select: { students: true } },
+          },
+        }),
+        prisma.subject.findMany({ select: { id: true, name: true, code: true, type: true, credits: true } }),
+        prisma.attendance.groupBy({
+          by: ['status'],
+          _count: { status: true },
+        }),
+      ]);
+
+      // Build attendance chart data
+      const statusMap: Record<string, number> = {};
+      for (const row of attendanceSummary) {
+        statusMap[row.status] = row._count.status;
+      }
+
+      const total = Object.values(statusMap).reduce((a, b) => a + b, 0);
+      const attendanceChart = [
+        { label: 'Hadir',     value: statusMap['PRESENT']    || 0, color: '#10B981', percent: total ? Math.round(((statusMap['PRESENT'] || 0) / total) * 100) : 0 },
+        { label: 'Terlambat', value: statusMap['LATE']       || 0, color: '#F59E0B', percent: total ? Math.round(((statusMap['LATE']    || 0) / total) * 100) : 0 },
+        { label: 'Sakit',     value: statusMap['SICK']       || 0, color: '#6366F1', percent: total ? Math.round(((statusMap['SICK']    || 0) / total) * 100) : 0 },
+        { label: 'Izin',      value: statusMap['PERMISSION'] || 0, color: '#8B5CF6', percent: total ? Math.round(((statusMap['PERMISSION'] || 0) / total) * 100) : 0 },
+        { label: 'Alfa',      value: statusMap['ABSENT']     || 0, color: '#EF4444', percent: total ? Math.round(((statusMap['ABSENT']  || 0) / total) * 100) : 0 },
+      ];
+
+      res.json({
+        classes: classes.map(c => ({ id: c.id, name: c.name, major: c.major, studentCount: c._count.students })),
+        subjects: subjects.slice(0, 20),
+        attendanceChart,
+        totalAttendance: total,
+        scheduleSource: demoVersionId ? 'DEMO' : 'NONE',
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ─── END DEMO MODE API ─────────────────────────────────────────────────────
 
   app.get('/api/intelligence/session/:sessionId/metrics', authenticate, async (req, res) => {
     try {
