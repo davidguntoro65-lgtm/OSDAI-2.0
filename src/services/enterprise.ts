@@ -1,7 +1,13 @@
 import { prisma } from '../lib/prisma';
 import { GoogleGenAI } from '@google/genai';
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
+const ai = new GoogleGenAI({
+  apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY || process.env.GEMINI_API_KEY || '',
+  httpOptions: {
+    apiVersion: '',
+    baseUrl: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL,
+  },
+});
 
 export const StudentService = {
   async getAll(params: { search?: string; majorId?: string; classId?: string; status?: string; page?: number; limit?: number; includeDeleted?: boolean }) {

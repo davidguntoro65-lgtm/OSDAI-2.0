@@ -1,9 +1,15 @@
 import { prisma } from '../lib/prisma';
 import { GpsService } from './gps';
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 import { randomBytes } from 'crypto';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const genAI = new GoogleGenAI({
+  apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY || process.env.GEMINI_API_KEY || '',
+  httpOptions: {
+    apiVersion: '',
+    baseUrl: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL,
+  },
+});
 
 export const IntelligenceService = {
   /**
@@ -361,11 +367,12 @@ export const IntelligenceService = {
     
     Format: Use Indonesian (Bahasa Indonesia). 2-3 sentences per point. Use numbered list.`;
 
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
     try {
-      const result = await model.generateContent(prompt);
-      return result.response.text();
+      const result = await genAI.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+      });
+      return result.text || "Gagal menghasilkan insight AI saat ini.";
     } catch (err) {
       console.error('AI Error:', err);
       return "Gagal menghasilkan insight AI saat ini.";

@@ -1,0 +1,515 @@
+# ROLE
+
+Act as:
+
+* Senior Enterprise UI/UX Architect
+* Senior Educational ERP Designer
+* Senior AI Visual Systems Engineer
+* Senior Dashboard Experience Designer
+* Senior Product Design Director
+* Senior Frontend Systems Architect
+* Senior Human-Centered UX Specialist
+
+PROJECT:
+"OSDAI — OTOMATISASI SEKOLAH DIGITAL BERBASIS ARTIFICIAL INTELLIGENT"
+
+MISSION:
+TOTAL REDESIGN of ALL dashboard pages.
+
+CURRENT PROBLEM IDENTIFICATION:
+The current UI still feels:
+
+* too empty
+* too static
+* too much blank spacing
+* low information density
+* weak hierarchy
+* visually unfinished
+* not enterprise-grade
+* not operationally immersive
+
+THIS MUST CHANGE.
+
+========================================================
+PRIMARY OBJECTIVE
+=================
+
+Create a:
+
+* dense but clean
+* modern but readable
+* futuristic but professional
+* information-rich but not crowded
+* highly interactive
+* AI operational dashboard
+
+SYSTEM MUST FEEL LIKE:
+
+* NASA operation center
+* modern fintech dashboard
+* AI command center
+* premium enterprise ecosystem
+
+BUT:
+still easy for:
+
+* guru
+* TU
+* kepala sekolah
+* siswa
+
+========================================================
+VERY IMPORTANT UI RULE
+======================
+
+NO LARGE EMPTY AREAS.
+
+EVERY SCREEN MUST:
+
+* contain useful information
+* contain live indicators
+* contain active widgets
+* contain intelligent summaries
+* contain contextual actions
+
+WITHOUT:
+
+* visual overload
+* clutter
+* confusion
+
+========================================================
+NEW GLOBAL LAYOUT STRUCTURE
+===========================
+
+REMOVE:
+large blank containers.
+
+REPLACE WITH:
+modular adaptive information grid.
+
+========================================================
+NEW LAYOUT SYSTEM
+=================
+
+USE:
+12-column responsive intelligent grid.
+
+========================================================
+DASHBOARD STRUCTURE
+===================
+
+## TOP AREA:
+
+1. Smart Header
+2. AI Status Bar
+3. Realtime School Metrics
+4. Global Search
+5. Quick Actions
+
+========================================================
+MIDDLE AREA
+===========
+
+Dynamic adaptive cards.
+
+AUTO FILLED with:
+
+* realtime attendance
+* class activity
+* active sessions
+* AI alerts
+* pending approvals
+* analytics
+* schedules
+* notifications
+
+========================================================
+BOTTOM AREA
+===========
+
+Always contain:
+
+* logs
+* audit trail
+* quick reports
+* activity stream
+* AI recommendations
+
+========================================================
+SIDEBAR REDESIGN
+================
+
+CURRENT ISSUE:
+sidebar feels too passive.
+
+## NEW DESIGN:
+
+* floating glass sidebar
+* active glow indicator
+* animated hover
+* collapsible smart groups
+* realtime notification badges
+* active pulse on current module
+
+========================================================
+WHEN MENU CLICKED
+=================
+
+MANDATORY:
+
+ONLY SHOW:
+module related to selected menu.
+
+NO MIXED CONTENT.
+
+## EXAMPLE:
+
+IF USER CLICK:
+"Sistem Presensi"
+
+ONLY SHOW:
+
+* attendance widgets
+* attendance analytics
+* attendance controls
+* attendance logs
+* attendance charts
+
+HIDE:
+
+* inventory
+* keuangan
+* surat
+* unrelated modules
+
+========================================================
+SMART CONTEXTUAL UI
+===================
+
+SYSTEM MUST:
+dynamically change dashboard content
+based on selected module.
+
+========================================================
+MODULE DESIGN STANDARD
+======================
+
+EVERY MODULE PAGE MUST CONTAIN:
+
+1. HEADER
+2. REALTIME SUMMARY
+3. MAIN DATA GRID
+4. AI INSIGHT PANEL
+5. QUICK ACTIONS
+6. ACTIVITY STREAM
+7. SMART FILTERS
+8. ANALYTICS
+
+========================================================
+NO PAGE SHOULD LOOK EMPTY
+=========================
+
+IF DATA EMPTY:
+show:
+
+* smart onboarding
+* intelligent recommendations
+* action suggestions
+* visual empty state
+
+NOT:
+blank white area.
+
+========================================================
+DASHBOARD PREVIEW REQUIREMENTS
+==============================
+
+BEFORE CODING:
+GENERATE VISUAL PREVIEW MOCKUP.
+
+MANDATORY:
+Create IMAGE PREVIEW for:
+
+========================================================
+
+1. BERANDA SISTEM
+   ========================================================
+
+MUST CONTAIN:
+
+* AI overview
+* attendance stats
+* active classes
+* realtime activities
+* quick launch buttons
+* AI recommendations
+* school integrity score
+* animated neural background
+
+========================================================
+2. SISTEM PRESENSI CERDAS
+=========================
+
+MUST CONTAIN:
+
+* active teacher sessions
+* live student confirmations
+* attendance percentages
+* realtime pulse status
+* geolocation validation
+* integrity analytics
+* attendance heatmap
+
+========================================================
+3. RUANG KENDALI KEPALA SEKOLAH
+===============================
+
+MUST CONTAIN:
+
+* executive overview
+* all active classes
+* AI alerts
+* attendance trends
+* teacher activity monitor
+* school operational health
+* realtime monitoring center
+
+========================================================
+4. PANEL GURU
+=============
+
+MUST CONTAIN:
+
+* today's teaching schedule
+* quick attendance controls
+* active session card
+* assignment shortcuts
+* class analytics
+* AI teaching insights
+
+========================================================
+5. PANEL SISWA
+==============
+
+MUST CONTAIN:
+
+* current class
+* attendance status
+* confirmation status
+* assignment reminders
+* learning progress
+* AI learning insights
+
+========================================================
+VISUAL DESIGN SYSTEM
+====================
+
+STYLE:
+AI Glassmorphism 2.0
+
+========================================================
+DESIGN CHARACTERISTICS
+======================
+
+* layered translucent cards
+* adaptive glass blur
+* subtle depth
+* premium shadows
+* soft orange AI glow
+* neural animated particles
+* operational density
+* elegant hierarchy
+
+========================================================
+BACKGROUND SYSTEM
+=================
+
+NO EMPTY WHITE BACKGROUND.
+
+USE:
+
+* animated neural mesh
+* flowing AI lines
+* glowing data particles
+* pastel gradient motion
+* subtle movement
+
+========================================================
+COLOR SYSTEM
+============
+
+PRIMARY:
+#FF6A00
+
+SECONDARY:
+
+* deep navy
+* soft lavender
+* pastel peach
+* intelligent cyan
+* warm white
+
+========================================================
+TYPOGRAPHY
+==========
+
+USE:
+
+* Poppins
+* Urbanist
+
+VISUAL HIERARCHY:
+
+* strong headers
+* compact metrics
+* readable tables
+* premium spacing
+
+========================================================
+DATA DENSITY RULE
+=================
+
+VERY IMPORTANT:
+
+NO GIANT EMPTY CARDS.
+
+EVERY CARD MUST:
+
+* contain useful information
+* contain metrics
+* contain visualization
+* contain interaction
+
+========================================================
+REALTIME ELEMENTS
+=================
+
+ADD:
+
+* live counters
+* animated charts
+* pulse indicators
+* websocket status
+* realtime logs
+* moving activity feed
+
+========================================================
+TABLE REDESIGN
+==============
+
+CURRENT ISSUE:
+tables feel rigid.
+
+## NEW STYLE:
+
+* floating table container
+* sticky header
+* row hover glow
+* smart filters
+* realtime updates
+* compact spacing
+* elegant pagination
+
+========================================================
+ANIMATION SYSTEM
+================
+
+USE:
+
+* Framer Motion
+* GPU transforms
+* lightweight animations
+
+ADD:
+
+* hover lift
+* smooth transitions
+* fade-in cards
+* pulse indicators
+* intelligent motion
+
+DO NOT:
+
+* overanimate
+* lag
+* create delay
+
+========================================================
+RESPONSIVE REQUIREMENTS
+=======================
+
+MOBILE:
+
+* stacked adaptive cards
+* collapsible analytics
+* swipe sections
+
+TABLET:
+
+* dual-column adaptive layout
+
+DESKTOP:
+
+* immersive AI command center
+
+========================================================
+TECHNICAL EXECUTION
+===================
+
+FRONTEND:
+
+* Next.js 15
+* TypeScript
+* Tailwind
+* Framer Motion
+* Zustand
+* TanStack Query
+
+========================================================
+MANDATORY IMPLEMENTATION RULES
+==============================
+
+* no placeholder widgets
+* no dead buttons
+* no blank sections
+* no duplicated cards
+* no inconsistent spacing
+* no mixed module content
+
+========================================================
+FINAL EXECUTION
+===============
+
+STEP 1:
+Generate HIGH-FIDELITY IMAGE PREVIEW first.
+
+STEP 2:
+Wait for evaluation.
+
+STEP 3:
+After approval:
+build exact UI into production frontend.
+
+========================================================
+IMPORTANT
+=========
+
+DO NOT generate generic admin dashboard.
+
+GENERATE:
+
+* immersive operational ecosystem
+* dense intelligent layout
+* realtime AI school command center
+* premium enterprise educational system
+
+THIS MUST LOOK:
+
+* expensive
+* futuristic
+* operational
+* alive
+* intelligent
+* professional
+* production ready.
