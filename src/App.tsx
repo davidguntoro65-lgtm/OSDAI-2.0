@@ -45,6 +45,8 @@ import FinanceModule from '@/components/FinanceModule';
 import LMSModule from '@/components/LMSModule';
 import AIAnalyticsModule from '@/components/AIAnalyticsModule';
 import PusatMonitoringKepsek from '@/components/PusatMonitoringKepsek';
+import ArchiveModule from '@/components/ArchiveModule';
+import SuratModule from '@/components/SuratModule';
 
 // OSDAI Logo / Branding Icon
 const OsdaiIcon = ({ size = 24 }: { size?: number }) => (
@@ -103,6 +105,12 @@ export default function App() {
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [loginError, setLoginError] = useState('');
+
+  // Announcement form state
+  const [annTitle, setAnnTitle] = useState('');
+  const [annTargets, setAnnTargets] = useState<string[]>([]);
+  const [annSending, setAnnSending] = useState(false);
+  const [annSent, setAnnSent] = useState(false);
 
   useEffect(() => {
     if (token) checkAuth();
@@ -511,38 +519,9 @@ export default function App() {
                 {activeTab === 'jadwal' && <TimetableModule authToken={token!} />}
                 {activeTab === 'analitik' && <AIAnalyticsModule authToken={token!} />}
 
-                {activeTab === 'arsip' && (
-                  <div className="space-y-6 pb-20">
-                    <div className="flex items-center justify-between">
-                      <h2 className="text-2xl font-black text-slate-900">Arsip Digital</h2>
-                      <Button className="rounded-2xl bg-orange-500 text-white px-6 font-black h-12 shadow-lg shadow-orange-900/20">
-                        + Unggah Arsip
-                      </Button>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                      {['Arsip Ijazah', 'SK Pegawai', 'Sertifikat Siswa'].map(t => (
-                        <GlassPanel key={t} className="bg-white/40 p-8 text-center border-dashed border-2 border-white/50">
-                          <Archive className="mx-auto mb-4 text-slate-300" size={32} />
-                          <p className="font-black text-slate-600">{t}</p>
-                          <p className="text-[10px] font-black text-slate-400 mt-2 uppercase tracking-widest">Kosong</p>
-                        </GlassPanel>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                {activeTab === 'arsip' && <ArchiveModule authToken={token!} />}
 
-                {activeTab === 'surat' && (
-                  <div className="space-y-6 pb-20">
-                    <div className="flex items-center justify-between">
-                      <h2 className="text-2xl font-black text-slate-900">Pusat Surat Digital</h2>
-                      <Button className="rounded-2xl bg-black text-white px-6 font-black h-12">+ Buat Surat</Button>
-                    </div>
-                    <GlassPanel className="bg-white/40 p-20 text-center">
-                      <FileText size={40} className="text-slate-200 mx-auto mb-4" />
-                      <p className="font-black text-slate-400 uppercase tracking-widest text-sm">Tidak ada surat tersimpan</p>
-                    </GlassPanel>
-                  </div>
-                )}
+                {activeTab === 'surat' && <SuratModule authToken={token!} />}
               </motion.div>
             </AnimatePresence>
           </div>
@@ -574,28 +553,73 @@ export default function App() {
             <p className="text-xs font-bold text-slate-500 leading-relaxed">
               Buat dan siarkan pengumuman secara instan ke seluruh sivitas sekolah.
             </p>
-            <div className="space-y-3 pt-2">
-              <div>
-                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Judul Pengumuman</p>
-                <Input
-                  placeholder="Tulis judul di sini..."
-                  className="h-12 rounded-2xl bg-white/40 border-white/60 font-bold placeholder:text-slate-400 text-sm"
-                />
+            {annSent ? (
+              <div className="flex flex-col items-center gap-3 py-4">
+                <div className="w-12 h-12 rounded-2xl bg-green-100 flex items-center justify-center">
+                  <Radio size={22} className="text-green-600" />
+                </div>
+                <p className="text-sm font-black text-green-700">Pengumuman Terkirim!</p>
+                <button
+                  onClick={() => { setAnnSent(false); setAnnTitle(''); setAnnTargets([]); }}
+                  className="text-[10px] font-black text-slate-400 hover:text-slate-700 uppercase tracking-widest underline"
+                >
+                  Buat Lagi
+                </button>
               </div>
-              <div className="flex flex-wrap gap-2 pt-1">
-                {['Admin', 'Waka', 'Guru', 'Siswa'].map(r => (
-                  <button
-                    key={r}
-                    className="px-4 py-1.5 rounded-full border border-white/60 bg-white/20 text-[10px] font-black uppercase text-slate-600 hover:bg-slate-900 hover:text-white transition-all duration-200"
-                  >
-                    {r}
-                  </button>
-                ))}
+            ) : (
+              <div className="space-y-3 pt-2">
+                <div>
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Judul Pengumuman</p>
+                  <Input
+                    value={annTitle}
+                    onChange={e => setAnnTitle(e.target.value)}
+                    placeholder="Tulis judul di sini..."
+                    className="h-12 rounded-2xl bg-white/40 border-white/60 font-bold placeholder:text-slate-400 text-sm"
+                  />
+                </div>
+                <div>
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Tujuan</p>
+                  <div className="flex flex-wrap gap-2">
+                    {['Admin', 'Waka', 'Guru', 'Siswa'].map(r => {
+                      const active = annTargets.includes(r);
+                      return (
+                        <button
+                          key={r}
+                          onClick={() => setAnnTargets(prev => active ? prev.filter(t => t !== r) : [...prev, r])}
+                          className={`px-4 py-1.5 rounded-full border text-[10px] font-black uppercase transition-all duration-200 ${
+                            active
+                              ? 'bg-slate-900 text-white border-slate-900'
+                              : 'border-white/60 bg-white/20 text-slate-600 hover:bg-slate-900 hover:text-white'
+                          }`}
+                        >
+                          {r}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                <Button
+                  className="w-full h-12 rounded-2xl bg-slate-900 text-white font-black flex items-center justify-center gap-2 shadow-xl mt-3 disabled:opacity-50"
+                  disabled={!annTitle.trim() || annSending}
+                  onClick={async () => {
+                    if (!annTitle.trim() || !token) return;
+                    setAnnSending(true);
+                    try {
+                      await fetch('/api/announcements', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                        body: JSON.stringify({ title: annTitle, targets: annTargets })
+                      });
+                      setAnnSent(true);
+                    } catch { /* ignore */ }
+                    finally { setAnnSending(false); }
+                  }}
+                >
+                  {annSending ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
+                  {annSending ? 'Mengirim...' : 'SIARAN KE SEMUA'}
+                </Button>
               </div>
-              <Button className="w-full h-13 rounded-2xl bg-slate-900 text-white font-black flex items-center justify-center gap-2 shadow-xl mt-3">
-                <Send size={15} /> SIARAN KE SEMUA
-              </Button>
-            </div>
+            )}
           </div>
         </GlassPanel>
 
@@ -610,13 +634,14 @@ export default function App() {
           </div>
           <div className="grid grid-cols-2 gap-3">
             {[
-              { label: 'Cek GPS', icon: Navigation },
-              { label: 'Cetak QR', icon: ShieldCheck },
-              { label: 'Laporan Hari Ini', icon: BarChart3 },
-              { label: 'Audit Log', icon: Activity },
-            ].map(({ label, icon: Icon }) => (
+              { label: 'Cek GPS', icon: Navigation, action: () => window.open('https://maps.google.com/?q=SMK+Negeri+1+Wonogiri', '_blank') },
+              { label: 'Cetak QR', icon: ShieldCheck, action: () => window.open(`/api/timetable/export/pdf?classId=all`, '_blank') },
+              { label: 'Laporan Hari Ini', icon: BarChart3, action: () => setActiveTab('analitik') },
+              { label: 'Arsip Digital', icon: Archive, action: () => setActiveTab('arsip') },
+            ].map(({ label, icon: Icon, action }) => (
               <button
                 key={label}
+                onClick={action}
                 className="p-4 rounded-[20px] bg-white/30 border border-white/50 text-[10px] font-black text-slate-600 hover:bg-[#FF6A00] hover:text-white hover:border-[#FF6A00] transition-all duration-200 flex flex-col items-center gap-2"
               >
                 <Icon size={16} />

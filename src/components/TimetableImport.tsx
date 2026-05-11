@@ -53,7 +53,7 @@ export default function TimetableImport({ authToken }: { authToken: string }) {
         headers: { 'Authorization': `Bearer ${authToken}` }
       });
       const data = await res.json();
-      setUploads(data);
+      setUploads(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error(err);
     }

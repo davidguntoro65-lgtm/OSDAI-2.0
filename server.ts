@@ -435,6 +435,178 @@ async function startServer() {
     }
   });
 
+  // Rooms Endpoint
+  app.get('/api/rooms', authenticate, async (_req, res) => {
+    try {
+      const rooms = await prisma.room.findMany({ orderBy: { name: 'asc' } });
+      res.json(rooms);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Timetable CRUD — Create & Delete individual schedule entries
+  app.post('/api/timetable', authenticate, authorize([Role.SUPER_ADMIN, Role.TU]), async (req, res) => {
+    try {
+      const { day, periodStart, periodEnd, teacherId, subjectId, roomId, classId } = req.body;
+      if (!day || !periodStart || !teacherId || !subjectId || !roomId || !classId) {
+        return res.status(400).json({ error: 'Semua field wajib diisi (day, periodStart, teacherId, subjectId, roomId, classId).' });
+      }
+      // Conflict check
+      const conflict = await prisma.schedule.findFirst({
+        where: {
+          day: Number(day),
+          periodStart: Number(periodStart),
+          deletedAt: null,
+          OR: [
+            { teacherId },
+            { roomId },
+            { classId },
+          ],
+        },
+        include: { subject: true, teacher: { include: { user: true } }, class: true }
+      });
+      if (conflict) {
+        const who = conflict.teacherId === teacherId ? `Guru (${conflict.teacher?.user?.name})` :
+                    conflict.roomId === roomId ? `Ruangan (${conflict.roomId})` :
+                    `Kelas (${conflict.class?.name})`;
+        return res.status(409).json({ error: `Konflik jadwal: ${who} sudah dijadwalkan di slot ini (${conflict.subject?.name}).` });
+      }
+      const schedule = await prisma.schedule.create({
+        data: {
+          day: Number(day),
+          periodStart: Number(periodStart),
+          periodEnd: Number(periodEnd || periodStart),
+          teacherId,
+          subjectId,
+          roomId,
+          classId,
+        },
+        include: { subject: true, teacher: { include: { user: true } }, room: true, class: true }
+      });
+      res.status(201).json(schedule);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete('/api/timetable/:id', authenticate, authorize([Role.SUPER_ADMIN, Role.TU]), async (req, res) => {
+    try {
+      await prisma.schedule.update({
+        where: { id: req.params.id },
+        data: { deletedAt: new Date() }
+      });
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Announcements Endpoints
+  app.get('/api/announcements', authenticate, async (_req, res) => {
+    try {
+      const docs = await prisma.digitalDocument.findMany({
+        where: { category: 'PENGUMUMAN', isArchived: false },
+        include: { uploader: true },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+      });
+      res.json(docs);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/announcements', authenticate, authorize([Role.SUPER_ADMIN, Role.TU, Role.KEPALA_SEKOLAH]), async (req: AuthRequest, res) => {
+    try {
+      const { title, targets } = req.body;
+      if (!title?.trim()) return res.status(400).json({ error: 'Judul pengumuman wajib diisi.' });
+      const refNo = `PGM-${Date.now()}`;
+      const doc = await prisma.digitalDocument.create({
+        data: {
+          title: title.trim(),
+          category: 'PENGUMUMAN',
+          fileUrl: '#',
+          metadata: JSON.stringify({ targets: targets || [] }),
+          referenceNo: refNo,
+          qrCode: `https://nexus.smk.id/verify/${refNo}`,
+          uploaderId: req.user!.userId,
+        }
+      });
+      res.status(201).json(doc);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Surat Digital Endpoints
+  app.get('/api/surat', authenticate, async (req, res) => {
+    try {
+      const { category } = req.query;
+      const suratCategories = ['SURAT_MASUK', 'SURAT_KELUAR', 'SURAT_EDARAN', 'SK'];
+      const docs = await prisma.digitalDocument.findMany({
+        where: {
+          isArchived: false,
+          category: category ? String(category) : { in: suratCategories },
+        },
+        include: { uploader: true },
+        orderBy: { createdAt: 'desc' },
+      });
+      res.json(docs);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/surat', authenticate, authorize([Role.SUPER_ADMIN, Role.TU, Role.KEPALA_SEKOLAH]), async (req: AuthRequest, res) => {
+    try {
+      const { title, category, fileUrl, referenceNo } = req.body;
+      if (!title?.trim()) return res.status(400).json({ error: 'Perihal/judul surat wajib diisi.' });
+      const refNo = referenceNo?.trim() || `${category?.split('_')[1] || 'DOC'}-${Date.now()}`;
+      const doc = await prisma.digitalDocument.create({
+        data: {
+          title: title.trim(),
+          category: category || 'SURAT_KELUAR',
+          fileUrl: fileUrl?.trim() || '#',
+          referenceNo: refNo,
+          qrCode: `https://nexus.smk.id/verify/${refNo}`,
+          uploaderId: req.user!.userId,
+        }
+      });
+      res.status(201).json(doc);
+    } catch (error: any) {
+      if ((error as any).code === 'P2002') {
+        return res.status(409).json({ error: 'Nomor surat sudah digunakan. Gunakan nomor berbeda.' });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete('/api/surat/:id', authenticate, authorize([Role.SUPER_ADMIN, Role.TU, Role.KEPALA_SEKOLAH]), async (req, res) => {
+    try {
+      await prisma.digitalDocument.update({
+        where: { id: req.params.id },
+        data: { isArchived: true }
+      });
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Archive delete
+  app.delete('/api/archive/:id', authenticate, authorize([Role.SUPER_ADMIN, Role.TU]), async (req, res) => {
+    try {
+      await prisma.digitalDocument.update({
+        where: { id: req.params.id },
+        data: { isArchived: true }
+      });
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // AI Analytics Endpoints
   app.get('/api/analytics/risk-students', authenticate, authorize([Role.SUPER_ADMIN, Role.BK, Role.KEPALA_SEKOLAH]), async (req, res) => {
     try {
