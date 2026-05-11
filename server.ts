@@ -960,6 +960,55 @@ async function startServer() {
     }
   });
 
+  // Kepala Sekolah: semua sesi aktif + ringkasan
+  app.get('/api/intelligence/semua-sesi-aktif', authenticate, authorize([Role.KEPALA_SEKOLAH, Role.SUPER_ADMIN]), async (req, res) => {
+    try {
+      const sessions = await prisma.classSession.findMany({
+        where: { signalStatus: 'ACTIVE' },
+        include: {
+          teacher: { include: { user: { select: { name: true } } } },
+          subject: { select: { name: true } },
+          class: { select: { name: true } },
+          attendances: true,
+        },
+        orderBy: { startTime: 'desc' },
+      });
+      const result = sessions.map(s => ({
+        id: s.id,
+        guru: s.teacher.user.name,
+        mapel: s.subject.name,
+        kelas: s.class.name,
+        jamMulai: s.startTime,
+        status: s.signalStatus,
+        hadir: s.attendances.filter(a => a.attendanceStatus === 'HADIR').length,
+        terlambat: s.attendances.filter(a => a.attendanceStatus === 'TERLAMBAT').length,
+        alfa: s.attendances.filter(a => a.attendanceStatus === 'ALFA').length,
+        totalRespond: s.attendances.filter(a => a.attendanceStatus !== 'ALFA').length,
+      }));
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Kepala Sekolah: statistik presensi hari ini
+  app.get('/api/intelligence/statistik-hari-ini', authenticate, authorize([Role.KEPALA_SEKOLAH, Role.SUPER_ADMIN]), async (req, res) => {
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const [totalSesi, totalHadir, totalTerlambat, totalAlfa, guruAktif] = await Promise.all([
+        prisma.classSession.count({ where: { startTime: { gte: today } } }),
+        prisma.studentAttendance.count({ where: { attendanceStatus: 'HADIR', timestamp: { gte: today } } }),
+        prisma.studentAttendance.count({ where: { attendanceStatus: 'TERLAMBAT', timestamp: { gte: today } } }),
+        prisma.studentAttendance.count({ where: { attendanceStatus: 'ALFA', timestamp: { gte: today } } }),
+        prisma.classSession.findMany({ where: { startTime: { gte: today } }, select: { teacherId: true }, distinct: ['teacherId'] }),
+      ]);
+      res.json({ totalSesi, totalHadir, totalTerlambat, totalAlfa, guruAktif: guruAktif.length });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Academic Endpoints
   app.get('/api/timetable/:classId', authenticate, async (req, res) => {
     try {
@@ -997,7 +1046,7 @@ async function startServer() {
   }
 
   httpServer.listen(PORT, '0.0.0.0', () => {
-    console.log(`EduNexus Alpha Server running at http://localhost:${PORT}`);
+    console.log(`OSDAI Server running at http://localhost:${PORT}`);
   });
 }
 

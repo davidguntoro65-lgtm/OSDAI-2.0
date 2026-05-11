@@ -1,0 +1,589 @@
+# ROLE
+
+Act as:
+
+* Principal Enterprise Architect
+* Senior Educational ERP Designer
+* Senior AI UX Engineer
+* Senior Motion System Designer
+* Senior Fullstack Engineer
+* Senior Realtime Dashboard Architect
+* Senior Accessibility Engineer
+* Senior School Management Systems Consultant
+
+PROJECT:
+"OSDAI — OTOMATISASI SEKOLAH DIGITAL BERBASIS ARTIFICIAL INTELLIGENT"
+
+MISSION:
+Revise and upgrade the ENTIRE OSDAI ecosystem into:
+
+* fully Indonesian-language enterprise system
+* professional school management platform
+* AI-powered educational operating system
+* realtime attendance monitoring center
+* futuristic yet user-friendly ecosystem
+
+THIS IS NOT:
+
+* translated UI only
+* cosmetic redesign
+* static admin dashboard
+* fake animation showcase
+
+THIS MUST BE:
+
+* real production-grade platform
+* realtime monitoring ecosystem
+* highly responsive
+* elegant
+* stable
+* legally auditable
+* psychologically comfortable
+* optimized for teachers and principals
+* optimized for Indonesian school workflow
+
+========================================================
+PRIMARY TARGETS
+===============
+
+1. REBRAND ENTIRE SYSTEM
+   FROM:
+   "EduNexus Alpha"
+
+TO:
+"OSDAI"
+
+FULL OFFICIAL BRAND NAME:
+"OTOMATISASI SEKOLAH DIGITAL BERBASIS ARTIFICIAL INTELLIGENT"
+
+========================================================
+2. PRINCIPAL MONITORING CENTER
+==============================
+
+MANDATORY:
+ALL ATTENDANCE MODULES
+must be fully monitored by:
+ROLE "KEPALA SEKOLAH"
+
+CREATE:
+"PUSTAT MONITORING PRESENSI SEKOLAH"
+
+THIS MUST BE:
+
+* enterprise-grade
+* realtime
+* visual
+* user-friendly
+* executive-level
+
+========================================================
+3. INDONESIAN LANGUAGE STANDARDIZATION
+======================================
+
+MANDATORY:
+Minimize ALL English usage.
+
+REPLACE:
+ALL UI LABELS
+ALL BUTTONS
+ALL NAVIGATION
+ALL STATUS
+ALL ALERTS
+
+WITH:
+formal Indonesian language.
+
+========================================================
+4. FUTURISTIC AI ANIMATION SYSTEM
+=================================
+
+ADD:
+
+* futuristic AI motion
+* neural animation
+* elegant transitions
+* floating particles
+* intelligent visual reactions
+* realtime pulse indicators
+
+BUT:
+system MUST remain:
+
+* lightweight
+* responsive
+* smooth
+* mobile optimized
+* professional
+
+========================================================
+SECTION 1:
+GLOBAL BRANDING REWRITE
+=======================
+
+REPLACE EVERYWHERE:
+
+OLD:
+
+* EduNexus
+* Neural Pulse
+* AI Nexus
+* Smart Attendance
+
+NEW:
+
+* OSDAI
+* Sistem Presensi Cerdas OSDAI
+* Pusat Monitoring OSDAI
+* Analitik Kelas OSDAI
+
+========================================================
+APPLICATION TITLE
+=================
+
+HEADER:
+"OSDAI"
+
+SUBTITLE:
+"OTOMATISASI SEKOLAH DIGITAL BERBASIS ARTIFICIAL INTELLIGENT"
+
+========================================================
+LOGIN SCREEN
+============
+
+SHOW:
+
+* Logo OSDAI
+* Animated neural background
+* Soft AI particles
+* Floating glass login panel
+
+TEXT:
+"Sistem Operasional Sekolah Berbasis Artificial Intelligent"
+
+========================================================
+SECTION 2:
+KETAT BAHASA INDONESIA
+======================
+
+REPLACE ALL ENGLISH UI.
+
+========================================================
+EXAMPLES
+========
+
+OLD:
+Dashboard
+
+NEW:
+Beranda Sistem
+
+---
+
+OLD:
+Attendance
+
+NEW:
+Presensi
+
+---
+
+OLD:
+Export
+
+NEW:
+Unduh Laporan
+
+---
+
+OLD:
+Confirmed
+
+NEW:
+Terkonfirmasi
+
+---
+
+OLD:
+Signal Active
+
+NEW:
+Sinyal Presensi Aktif
+
+---
+
+OLD:
+Class Session
+
+NEW:
+Sesi Pembelajaran
+
+---
+
+OLD:
+Analytics
+
+NEW:
+Analitik Pembelajaran
+
+---
+
+OLD:
+Teacher Dashboard
+
+NEW:
+Panel Guru
+
+---
+
+OLD:
+Student Dashboard
+
+NEW:
+Panel Siswa
+
+---
+
+OLD:
+Realtime Monitoring
+
+NEW:
+Pemantauan Langsung
+
+========================================================
+SYSTEM REQUIREMENT:
+===================
+
+NO MIXED LANGUAGE UI.
+
+USE:
+
+* Bahasa Indonesia formal
+* mudah dipahami
+* profesional sekolah
+* clean wording
+* consistent terminology
+
+========================================================
+SECTION 3:
+KEPALA SEKOLAH SUPER MONITORING
+===============================
+
+CREATE:
+"RUANG KENDALI KEPALA SEKOLAH"
+
+THIS IS:
+Executive realtime monitoring center.
+
+========================================================
+FEATURES
+========
+
+1. MONITOR SEMUA KELAS
+2. MONITOR SEMUA GURU
+3. MONITOR PRESENSI HARI INI
+4. MONITOR KETERLAMBATAN
+5. MONITOR GURU AKTIF
+6. MONITOR SISWA BELUM HADIR
+7. MONITOR JAM PELAJARAN BERLANGSUNG
+8. MONITOR STATUS SINYAL PRESENSI
+9. MONITOR INTEGRITAS GPS
+10. MONITOR AKTIVITAS SISTEM
+
+========================================================
+REALTIME EXECUTIVE DASHBOARD
+============================
+
+DISPLAY:
+
+* jumlah kelas aktif
+* jumlah guru aktif
+* total siswa hadir
+* total siswa terlambat
+* grafik presensi realtime
+* peta GPS sekolah
+* status sesi pembelajaran
+* aktivitas guru realtime
+
+========================================================
+LIVE TABLE:
+===========
+
+SHOW:
+
+* Nama Guru
+* Mata Pelajaran
+* Kelas
+* Jam
+* Status Presensi
+* Jumlah Hadir
+* Jumlah Alfa
+* Status Sinyal
+
+AUTO UPDATE:
+WITHOUT REFRESH.
+
+========================================================
+AI INSIGHT PANEL
+================
+
+GENERATE:
+automatic executive insights.
+
+EXAMPLE:
+
+* "Kelas XI AKL 1 mengalami keterlambatan tinggi."
+* "Guru Matematika belum mengaktifkan presensi."
+* "Persentase kehadiran meningkat 8%."
+
+========================================================
+SECTION 4:
+ANIMATION & AI VISUAL SYSTEM
+============================
+
+CREATE:
+"FUTURE AI VIEW"
+
+========================================================
+ANIMATION REQUIREMENTS
+======================
+
+ADD:
+
+* floating neural particles
+* glowing AI pulse
+* elegant hover lift
+* fluid glass reflections
+* animated background mesh
+* moving data streams
+* soft realtime pulse effect
+* intelligent transitions
+
+========================================================
+IMPORTANT:
+==========
+
+Animations MUST:
+
+* not lag
+* not overload CPU
+* not break responsiveness
+* not disturb readability
+
+========================================================
+USE:
+====
+
+* Framer Motion
+* GPU transforms
+* CSS animations optimized
+* Canvas particles lightweight
+
+========================================================
+ON HOVER:
+=========
+
+PANELS:
+
+* slightly float upward
+* increase glow softly
+* add subtle depth
+
+BUTTONS:
+
+* soft pulse animation
+* intelligent ripple effect
+
+========================================================
+REALTIME EVENTS:
+================
+
+WHEN STUDENT CONFIRMED:
+
+* soft pulse animation
+* glowing confirmation
+* smooth insertion into list
+
+WHEN TEACHER ACTIVATES SIGNAL:
+
+* neural wave animation emitted
+
+========================================================
+SECTION 5:
+RESPONSIVE SYSTEM
+=================
+
+MANDATORY:
+SUPER RESPONSIVE.
+
+========================================================
+BREAKPOINT OPTIMIZATION
+=======================
+
+MOBILE:
+
+* floating panels become stacked
+* preserve glass effect
+* preserve animation smoothness
+
+TABLET:
+
+* adaptive neural layout
+
+DESKTOP:
+
+* full immersive AI ecosystem
+
+========================================================
+NO:
+===
+
+* overlapping broken UI
+* text overflow
+* animation jitter
+* hydration mismatch
+* layout shift
+
+========================================================
+SECTION 6:
+PROFESSIONAL UX SYSTEM
+======================
+
+SYSTEM MUST FEEL:
+
+* premium
+* elegant
+* calm
+* futuristic
+* educational
+* executive-level
+
+========================================================
+ADD:
+====
+
+* loading skeletons
+* smooth page transitions
+* empty state illustrations
+* soft notification toasts
+* realtime activity indicators
+
+========================================================
+SECTION 7:
+PRESENSI MONITORING FLOW
+========================
+
+FLOW:
+
+1. Guru login
+2. Guru aktifkan sinyal
+3. Sistem membuka sesi pembelajaran
+4. Siswa merespon sinyal
+5. Data masuk realtime
+6. Guru melihat siswa terkonfirmasi
+7. Kepala Sekolah memonitor seluruh proses secara realtime
+8. Data otomatis masuk rekapitulasi
+9. Laporan otomatis tersedia
+
+========================================================
+SECTION 8:
+REPORTING SYSTEM
+================
+
+GENERATE:
+
+* laporan presensi harian
+* laporan keterlambatan
+* laporan guru aktif
+* laporan integritas GPS
+* laporan aktivitas kelas
+
+EXPORT:
+
+* PDF resmi sekolah
+* Excel profesional
+* Arsip digital
+
+========================================================
+QR VALIDATION
+=============
+
+ALL REPORTS:
+must include:
+
+* QR verifikasi
+* hash laporan
+* timestamp
+* validasi sistem OSDAI
+
+========================================================
+SECTION 9:
+TECHNICAL REQUIREMENTS
+======================
+
+FRONTEND:
+
+* Next.js 15
+* Tailwind
+* TypeScript
+* Framer Motion
+* Zustand
+* TanStack Query
+
+BACKEND:
+
+* NestJS
+* Prisma
+* PostgreSQL
+* Redis
+* Socket.IO
+
+========================================================
+CODE QUALITY
+============
+
+MANDATORY:
+
+* modular architecture
+* reusable components
+* zero duplicated logic
+* clean services
+* clean DTO
+* clean websocket events
+* clean realtime state management
+
+========================================================
+FINAL EXECUTION
+===============
+
+GENERATE:
+
+* complete UI rewrite
+* Indonesian wording rewrite
+* Kepala Sekolah monitoring center
+* realtime attendance center
+* AI animation system
+* neural background engine
+* responsive layouts
+* executive dashboards
+* professional reports
+* QR validation
+* realtime monitoring
+* websocket synchronization
+* audit logs
+* optimized performance
+
+IMPORTANT:
+
+* NO PLACEHOLDERS
+* NO MIXED LANGUAGE
+* NO BROKEN RESPONSIVE
+* NO HEAVY ANIMATION
+* NO GENERIC ADMIN TEMPLATE
+* NO RIGID ERP STYLE
+
+BUILD:
+REAL ENTERPRISE SCHOOL SYSTEM
+WITH:
+FUTURISTIC AI EXPERIENCE
+AND
+PROFESSIONAL INDONESIAN EDUCATIONAL UX.
