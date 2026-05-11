@@ -174,19 +174,10 @@ async function startServer() {
     }
   });
   
-  app.get('/api/classes', authenticate, async (req, res) => {
-    try {
-      const classes = await prisma.class.findMany({
-        include: { major: true }
-      });
-      res.json(classes);
-    } catch (error) {
-      res.status(500).json({ error: 'Failed to fetch classes' });
-    }
-  });
+  // NOTE: full /api/classes CRUD is defined after intelligence routes below
 
   // Student SIS Endpoints
-  app.get('/api/students', authenticate, authorize([Role.SUPER_ADMIN, Role.TU, Role.KEPALA_SEKOLAH]), async (req: AuthRequest, res) => {
+  app.get('/api/students', authenticate, authorize([Role.SUPER_ADMIN, Role.TU, Role.KEPALA_SEKOLAH, Role.GURU]), async (req: AuthRequest, res) => {
     try {
       const { search, majorId, classId, status, page, limit, includeDeleted } = req.query;
       const students = await StudentService.getAll({

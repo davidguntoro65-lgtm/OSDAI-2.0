@@ -597,6 +597,25 @@ export default function App() {
         badge={badges}
       />
 
+      {/* Switch to Web Mode button (for admin/guru/kepsek) */}
+      {(isAdmin || isGuru || isKepsek) && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.8, x: -10 }}
+          animate={{ opacity: 1, scale: 1, x: 0 }}
+          transition={{ delay: 0.5 }}
+          className="fixed bottom-[88px] left-4 z-50"
+        >
+          <button
+            onClick={() => handleModeSelect('web')}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-black shadow-lg border transition-all active:scale-95"
+            style={{ background: 'rgba(255,106,0,0.9)', color: '#fff', borderColor: 'rgba(255,106,0,0.4)', backdropFilter: 'blur(8px)' }}
+            title="Beralih ke Mode Web Enterprise"
+          >
+            🖥 MODE WEB
+          </button>
+        </motion.div>
+      )}
+
       {/* Floating Action Button for Guru */}
       {isGuru && activeTab === 'presensi' && (
         <motion.div
