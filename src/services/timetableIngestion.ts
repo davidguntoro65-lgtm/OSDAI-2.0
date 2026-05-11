@@ -1,5 +1,4 @@
 import { prisma } from '../lib/prisma';
-import * as pdfjs from 'pdfjs-dist';
 import * as ExcelJS from 'exceljs';
 import Fuse from 'fuse.js';
 import { createHash } from 'crypto';
@@ -93,7 +92,8 @@ export const NormalizationService = {
 export const PDFExtractionService = {
   async extract(buffer: Buffer): Promise<RawSlot[]> {
     const data = new Uint8Array(buffer);
-    // Setting up worker for pdfjs in Node environment
+    // Dynamically import pdfjs to avoid browser-only APIs crashing Node.js at startup
+    const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
     const loadingTask = pdfjs.getDocument({ 
       data,
       useSystemFonts: true,
