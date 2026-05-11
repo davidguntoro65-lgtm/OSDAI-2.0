@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  # Application Server
+  app:
+    build: .
+    container_name: edunexus_app
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://edunexus_user:edunexus_password@db:5432/edunexus_db?schema=public
+      - REDIS_URL=redis://redis:6379
+      - NODE_ENV=production
+    depends_on:
+      - db
+      - redis
+    networks:
+      - edunexus_network
+
+  # Database Engine
+  db:
+    image: postgres:15-alpine
+    container_name: edunexus_db
+    restart: always
+    environment:
+      POSTGRES_USER: edunexus_user
+      POSTGRES_PASSWORD: edunexus_password
+      POSTGRES_DB: edunexus_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    networks:
+      - edunexus_network
+
+  # Cache & Real-time Layer
+  redis:
+    image: redis:7-alpine
+    container_name: edunexus_redis
+    restart: always
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - edunexus_network
+
+  # Reverse Proxy & SSL
+  nginx:
+    image: nginx:stable-alpine
+    container_name: edunexus_proxy
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - app
+    networks:
+      - edunexus_network
+
+networks:
+  edunexus_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:

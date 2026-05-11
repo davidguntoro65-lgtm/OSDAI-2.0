@@ -1,0 +1,14 @@
+{
+  "name": "EduNexus Alpha",
+  "description": "Enterprise SMK ERP + LMS Platform with AI Analytics and Blockchain Certification.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "ERP",
+    "LMS",
+    "AI Analytics",
+    "Blockchain"
+  ]
+}

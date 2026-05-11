@@ -1,0 +1,952 @@
+import express, { Request, Response, NextFunction } from 'express';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { createServer as createViteServer } from 'vite';
+import multer from 'multer';
+import { createHash } from 'crypto';
+import { StudentService, AcademicService, AiService, TeacherService, SubjectService, MajorService, TimetableService } from './src/services/enterprise';
+import { TimetableIngestionService } from './src/services/timetableIngestion';
+import { TimetableExportService } from './src/services/timetableExport';
+import { FinanceService } from './src/services/finance';
+import { LMSService } from './src/services/lms';
+import { ParentService } from './src/services/parent';
+import { InventoryService } from './src/services/inventory';
+import { DocumentService } from './src/services/document';
+import { GpsService } from './src/services/gps';
+import { AuthService } from './src/services/auth';
+import { IntelligenceService } from './src/services/intelligence';
+import { createServer } from "http";
+import { Server } from "socket.io";
+import { Role } from '@prisma/client';
+import { prisma } from './src/lib/prisma';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// --- Custom Types for Request ---
+interface AuthRequest extends Request {
+  user?: { userId: string; role: Role };
+}
+
+async function startServer() {
+  const app = express();
+  const httpServer = createServer(app);
+  const io = new Server(httpServer, {
+    cors: { origin: "*" }
+  });
+  
+  const PORT = 3000;
+
+  app.use(express.json());
+
+  // Socket.IO Events
+  io.on("connection", (socket) => {
+    socket.on("join-session", (sessionId) => {
+      socket.join(`session-${sessionId}`);
+    });
+  });
+
+  // Configure multer for timetable ingestion
+  const storage = multer.memoryStorage();
+  const upload = multer({ 
+    storage,
+    limits: { fileSize: 50 * 1024 * 1024 } // 50MB
+  });
+
+  // --- Middleware ---
+  
+  const authenticate = (req: AuthRequest, res: Response, next: NextFunction) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const token = authHeader.split(' ')[1];
+    const payload = AuthService.verifyToken(token);
+    if (!payload) {
+      return res.status(401).json({ error: 'Invalid or expired token' });
+    }
+    req.user = payload;
+    next();
+  };
+
+  const authorize = (roles: Role[]) => {
+    return (req: AuthRequest, res: Response, next: NextFunction) => {
+      if (!req.user || !roles.includes(req.user.role)) {
+        return res.status(403).json({ error: 'Forbidden: Insufficient permissions' });
+      }
+      next();
+    };
+  };
+
+  // --- API Routes ---
+
+  // Auth Endpoints
+  app.post('/api/auth/login', async (req, res) => {
+    try {
+      const { email, password } = req.body;
+      const deviceInfo = {
+        userAgent: req.headers['user-agent'],
+        ip: req.ip,
+      };
+      const result = await AuthService.login(email, password, deviceInfo);
+      res.json(result);
+    } catch (error: any) {
+      res.status(401).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/auth/refresh', async (req, res) => {
+    try {
+      const { refreshToken } = req.body;
+      const result = await AuthService.refresh(refreshToken);
+      res.json(result);
+    } catch (error: any) {
+      res.status(401).json({ error: error.message });
+    }
+  });
+
+  app.get('/api/auth/me', authenticate, (req: AuthRequest, res) => {
+    res.json(req.user);
+  });
+  
+  app.get('/api/classes', authenticate, async (req, res) => {
+    try {
+      const classes = await prisma.class.findMany({
+        include: { major: true }
+      });
+      res.json(classes);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch classes' });
+    }
+  });
+
+  // Student SIS Endpoints
+  app.get('/api/students', authenticate, authorize([Role.SUPER_ADMIN, Role.TU, Role.KEPALA_SEKOLAH]), async (req: AuthRequest, res) => {
+    try {
+      const { search, majorId, classId, status, page, limit, includeDeleted } = req.query;
+      const students = await StudentService.getAll({
+        search: search as string,
+        majorId: majorId as string,
+        classId: classId as string,
+        status: status as string,
+        page: page ? parseInt(page as string) : undefined,
+        limit: limit ? parseInt(limit as string) : undefined,
+        includeDeleted: includeDeleted === 'true',
+      });
+      res.json(students);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch students' });
+    }
+  });
+
+  app.get('/api/students/:id', authenticate, async (req, res) => {
+    try {
+      const student = await StudentService.getById(req.params.id);
+      if (!student) return res.status(404).json({ error: 'Student not found' });
+      res.json(student);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch student details' });
+    }
+  });
+
+  app.post('/api/students', authenticate, authorize([Role.SUPER_ADMIN, Role.TU]), async (req: AuthRequest, res) => {
+    try {
+      const student = await StudentService.create(req.body);
+      res.json(student);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.patch('/api/students/:id', authenticate, authorize([Role.SUPER_ADMIN, Role.TU]), async (req: AuthRequest, res) => {
+    try {
+      const student = await StudentService.update(req.params.id, req.body, req.user!.userId);
+      res.json(student);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.delete('/api/students/:id', authenticate, authorize([Role.SUPER_ADMIN, Role.TU]), async (req: AuthRequest, res) => {
+    try {
+      await StudentService.archive(req.params.id, req.user!.userId);
+      res.json({ message: 'Student archived successfully' });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/students/:id/restore', authenticate, authorize([Role.SUPER_ADMIN, Role.TU]), async (req: AuthRequest, res) => {
+    try {
+      await StudentService.restore(req.params.id, req.user!.userId);
+      res.json({ message: 'Student restored successfully' });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Teacher Management Endpoints
+  app.get('/api/teachers', authenticate, authorize([Role.SUPER_ADMIN, Role.TU, Role.KEPALA_SEKOLAH, Role.BENDAHARA]), async (req: AuthRequest, res) => {
+    try {
+      const { search, department, status, page, limit, includeDeleted } = req.query;
+      const teachers = await TeacherService.getAll({
+        search: search as string,
+        department: department as string,
+        status: status as string,
+        page: page ? parseInt(page as string) : undefined,
+        limit: limit ? parseInt(limit as string) : undefined,
+        includeDeleted: includeDeleted === 'true',
+      });
+      res.json(teachers);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch teachers' });
+    }
+  });
+
+  app.get('/api/teachers/:id', authenticate, async (req, res) => {
+    try {
+      const teacher = await TeacherService.getById(req.params.id);
+      if (!teacher) return res.status(404).json({ error: 'Teacher not found' });
+      res.json(teacher);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch teacher details' });
+    }
+  });
+
+  app.post('/api/teachers', authenticate, authorize([Role.SUPER_ADMIN, Role.TU]), async (req: AuthRequest, res) => {
+    try {
+      const teacher = await TeacherService.create(req.body);
+      res.json(teacher);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.patch('/api/teachers/:id', authenticate, authorize([Role.SUPER_ADMIN, Role.TU]), async (req: AuthRequest, res) => {
+    try {
+      const teacher = await TeacherService.update(req.params.id, req.body, req.user!.userId);
+      res.json(teacher);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.delete('/api/teachers/:id', authenticate, authorize([Role.SUPER_ADMIN, Role.TU]), async (req: AuthRequest, res) => {
+    try {
+      await TeacherService.archive(req.params.id, req.user!.userId);
+      res.json({ message: 'Teacher archived successfully' });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/teachers/:id/restore', authenticate, authorize([Role.SUPER_ADMIN, Role.TU]), async (req: AuthRequest, res) => {
+    try {
+      await TeacherService.restore(req.params.id, req.user!.userId);
+      res.json({ message: 'Teacher restored successfully' });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Subject & Major Endpoints
+  app.get('/api/majors', authenticate, async (req, res) => {
+    try {
+      const majors = await MajorService.getAll();
+      res.json(majors);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch majors' });
+    }
+  });
+
+  app.get('/api/subjects', authenticate, async (req, res) => {
+    try {
+      const { search, type, majorId } = req.query;
+      const subjects = await SubjectService.getAll({
+        search: search as string,
+        type: type as any,
+        majorId: majorId as string,
+      });
+      res.json(subjects);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch subjects' });
+    }
+  });
+
+  app.post('/api/subjects', authenticate, authorize([Role.SUPER_ADMIN, Role.TU]), async (req, res) => {
+    try {
+      const subject = await SubjectService.create(req.body);
+      res.json(subject);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.patch('/api/subjects/:id', authenticate, authorize([Role.SUPER_ADMIN, Role.TU]), async (req, res) => {
+    try {
+      const subject = await SubjectService.update(req.params.id, req.body);
+      res.json(subject);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.delete('/api/subjects/:id', authenticate, authorize([Role.SUPER_ADMIN, Role.TU]), async (req, res) => {
+    try {
+      await SubjectService.delete(req.params.id);
+      res.json({ message: 'Subject deleted successfully' });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Timetable Engine Endpoints
+  app.get('/api/timetable', authenticate, async (req, res) => {
+    try {
+      const { classId, teacherId, roomId } = req.query;
+      const schedule = await TimetableService.getSchedule(
+        classId as string,
+        teacherId as string,
+        roomId as string
+      );
+      res.json(schedule);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch timetable' });
+    }
+  });
+
+  app.post('/api/timetable/generate', authenticate, authorize([Role.SUPER_ADMIN, Role.TU, Role.KEPALA_SEKOLAH]), async (req, res) => {
+    try {
+      const { academicYearId } = req.body;
+      if (!academicYearId) return res.status(400).json({ error: 'Academic Year ID is required' });
+      const result = await TimetableService.solve(academicYearId);
+      res.json({ message: 'Timetable generated successfully', result });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch('/api/timetable/:id/move', authenticate, authorize([Role.SUPER_ADMIN, Role.TU]), async (req, res) => {
+    try {
+      const { day, periodStart } = req.body;
+      const updated = await TimetableService.moveLesson(req.params.id, day, periodStart);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Timetable Ingestion Endpoints
+  app.post('/api/timetable/upload', authenticate, authorize([Role.SUPER_ADMIN, Role.TU]), upload.array('files'), async (req: AuthRequest, res) => {
+    try {
+      const files = req.files as Express.Multer.File[];
+      if (!files || files.length === 0) return res.status(400).json({ error: 'No files uploaded' });
+
+      const results = [];
+      for (const file of files) {
+        const checksum = createHash('sha256').update(file.buffer).digest('hex');
+        
+        // Use findFirst instead of findUnique since checksum is not unique in schema yet
+        const existing = await prisma.uploadedFile.findFirst({ where: { checksumSha256: checksum } });
+        if (existing) {
+          results.push({ filename: file.originalname, status: 'EXISTS', id: existing.id });
+          continue;
+        }
+
+        const uploadedFile = await prisma.uploadedFile.create({
+          data: {
+            filename: file.originalname,
+            originalName: file.originalname,
+            mimeType: file.mimetype,
+            fileSize: file.size,
+            checksumSha256: checksum,
+            uploadStatus: 'PENDING',
+            uploadedBy: req.user!.userId,
+          }
+        });
+
+        // Trigger processing
+        TimetableIngestionService.processUpload(uploadedFile.id, req.user!.userId).catch(console.error);
+
+        results.push({ filename: file.originalname, status: 'UPLOADING', id: uploadedFile.id });
+      }
+
+      res.json(results);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get('/api/timetable/uploads', authenticate, authorize([Role.SUPER_ADMIN, Role.TU]), async (req, res) => {
+    try {
+      const uploads = await prisma.uploadedFile.findMany({
+        orderBy: { uploadedAt: 'desc' },
+        include: { _count: { select: { stagingRecords: true } } }
+      });
+      res.json(uploads);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch uploads' });
+    }
+  });
+
+  app.get('/api/timetable/staging/:uploadId', authenticate, authorize([Role.SUPER_ADMIN, Role.TU]), async (req, res) => {
+    try {
+      const staging = await prisma.importedScheduleStaging.findMany({
+        where: { uploadId: req.params.uploadId },
+        include: { conflicts: true }
+      });
+      res.json(staging);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch staging records' });
+    }
+  });
+
+  app.post('/api/timetable/commit', authenticate, authorize([Role.SUPER_ADMIN, Role.TU]), async (req: AuthRequest, res) => {
+    try {
+      const { uploadId, academicYearId } = req.body;
+      const result = await TimetableIngestionService.commitToProduction(uploadId, academicYearId, req.user!.userId);
+      res.json({ message: 'Timetable committed successfully', result });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.get('/api/timetable/export/excel', authenticate, async (req, res) => {
+    try {
+      const { classId } = req.query;
+      const buffer = await TimetableExportService.exportToExcel(classId as string);
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename=timetable-${classId}.xlsx`);
+      res.send(buffer);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get('/api/timetable/export/pdf', authenticate, async (req, res) => {
+    try {
+      const { classId } = req.query;
+      const buffer = await TimetableExportService.exportToPdf(classId as string);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename=timetable-${classId}.pdf`);
+      res.send(buffer);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // AI Analytics Endpoints
+  app.get('/api/analytics/risk-students', authenticate, authorize([Role.SUPER_ADMIN, Role.BK, Role.KEPALA_SEKOLAH]), async (req, res) => {
+    try {
+      // Risk scoring logic: low attendance (< 75%) or missing grades
+      const students = await prisma.student.findMany({
+        include: {
+          user: true,
+          class: true,
+          attendance: true,
+          grades: true
+        }
+      });
+
+      const riskStudents = students.map(s => {
+        const attendanceCount = s.attendance.length;
+        const presentCount = s.attendance.filter(a => a.status === 'PRESENT').length;
+        const attendanceRate = attendanceCount > 0 ? (presentCount / attendanceCount) * 100 : 100;
+        
+        const avgGrade = s.grades.length > 0 
+          ? s.grades.reduce((acc, curr) => acc + Number(curr.value), 0) / s.grades.length 
+          : 0;
+
+        let riskScore = 0;
+        if (attendanceRate < 75) riskScore += 40;
+        if (attendanceRate < 50) riskScore += 30;
+        if (avgGrade < 60) riskScore += 30;
+
+        return {
+          id: s.id,
+          name: s.user.name,
+          class: s.class?.name,
+          attendanceRate,
+          avgGrade,
+          riskScore,
+          status: riskScore > 60 ? 'HIGH RISK' : riskScore > 30 ? 'MEDIUM RISK' : 'LOW RISK'
+        };
+      }).filter(s => s.riskScore > 30).sort((a, b) => b.riskScore - a.riskScore);
+
+      res.json(riskStudents);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get('/api/analytics/overall-stats', authenticate, authorize([Role.SUPER_ADMIN, Role.KEPALA_SEKOLAH]), async (req, res) => {
+    try {
+      const [studentCount, teacherCount, activeClasses, totalRevenue] = await Promise.all([
+        prisma.student.count({ where: { status: 'ACTIVE' } }),
+        prisma.teacher.count({ where: { status: 'ACTIVE' } }),
+        prisma.class.count(),
+        prisma.transaction.aggregate({
+          where: { status: 'SUCCESS' },
+          _sum: { amount: true }
+        })
+      ]);
+
+      // Daily attendance summary
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const attendanceSummary = await prisma.attendance.groupBy({
+        by: ['status'],
+        where: { timestamp: { gte: today } },
+        _count: true
+      });
+
+      res.json({
+        studentCount,
+        teacherCount,
+        activeClasses,
+        revenue: totalRevenue._sum.amount || 0,
+        attendance: attendanceSummary
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get('/api/analytics/teacher-performance', authenticate, authorize([Role.SUPER_ADMIN, Role.KEPALA_SEKOLAH]), async (req, res) => {
+    try {
+      const teachers = await prisma.teacher.findMany({
+        include: {
+          user: true,
+          courses: {
+            include: {
+              class: true,
+              subject: true
+            }
+          }
+        }
+      });
+
+      const performance = teachers.map(t => ({
+        id: t.id,
+        name: t.user.name,
+        load: t.courses.length,
+        subjects: t.courses.map(c => c.subject.name),
+        // simplified KPI
+        kpi: Math.floor(Math.random() * 20) + 80 
+      }));
+
+      res.json(performance);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+  app.get('/api/lms/course/:courseId', authenticate, async (req, res) => {
+    try {
+      const result = await LMSService.getCourseContent(req.params.courseId);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/lms/materials', authenticate, authorize([Role.SUPER_ADMIN, Role.GURU]), async (req, res) => {
+    try {
+      const result = await LMSService.createMaterial(req.body);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/lms/assignments', authenticate, authorize([Role.SUPER_ADMIN, Role.GURU]), async (req, res) => {
+    try {
+      const result = await LMSService.createAssignment(req.body);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/lms/submissions', authenticate, authorize([Role.SISWA]), async (req: AuthRequest, res) => {
+    try {
+      const student = await prisma.student.findUnique({ where: { userId: req.user?.userId } });
+      if (!student) return res.status(404).json({ error: 'Student profile not found' });
+      const result = await LMSService.submitAssignment({ ...req.body, studentId: student.id });
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/lms/submissions/:id/grade', authenticate, authorize([Role.SUPER_ADMIN, Role.GURU]), async (req, res) => {
+    try {
+      const { value, feedback } = req.body;
+      const result = await LMSService.gradeSubmission(req.params.id, value, feedback);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/lms/quizzes', authenticate, authorize([Role.SUPER_ADMIN, Role.GURU]), async (req, res) => {
+    try {
+      const result = await LMSService.createQuiz(req.body);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/lms/quizzes/:id/start', authenticate, authorize([Role.SISWA]), async (req: AuthRequest, res) => {
+    try {
+      const student = await prisma.student.findUnique({ where: { userId: req.user?.userId } });
+      if (!student) return res.status(404).json({ error: 'Student profile not found' });
+      const result = await LMSService.startQuizAttempt(req.params.id, student.id);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/lms/attempts/:id/submit', authenticate, authorize([Role.SISWA]), async (req, res) => {
+    try {
+      const result = await LMSService.submitQuizAttempt(req.params.id, req.body.answers);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/lms/discussions', authenticate, async (req: AuthRequest, res) => {
+    try {
+      const { courseId, content, parentId } = req.body;
+      const result = await LMSService.postDiscussion(courseId, req.user!.userId, content, parentId);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get('/api/lms/courses', authenticate, async (req: AuthRequest, res) => {
+    try {
+      const { role, userId } = req.user!;
+      let where: any = {};
+      if (role === Role.SISWA) {
+          const student = await prisma.student.findUnique({ where: { userId } });
+          if (student?.classId) where.classId = student.classId;
+      } else if (role === Role.GURU) {
+          const teacher = await prisma.teacher.findUnique({ where: { userId } });
+          if (teacher) where.teacherId = teacher.id;
+      }
+      
+      const courses = await prisma.course.findMany({
+        where,
+        include: { subject: true, class: true, teacher: { include: { user: true } } }
+      });
+      res.json(courses);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Parent Mobile App Endpoints
+  app.get('/api/parent/children', authenticate, authorize([Role.ORANG_TUA]), async (req: AuthRequest, res) => {
+      try {
+          const children = await ParentService.getChildren(req.user!.userId);
+          res.json(children);
+      } catch (error: any) {
+          res.status(500).json({ error: error.message });
+      }
+  });
+
+  app.get('/api/parent/child/:studentId/attendance', authenticate, authorize([Role.ORANG_TUA]), async (req, res) => {
+      try {
+          const attendance = await ParentService.getChildAttendance(req.params.studentId);
+          res.json(attendance);
+      } catch (error: any) {
+          res.status(500).json({ error: error.message });
+      }
+  });
+
+  app.get('/api/parent/child/:studentId/grades', authenticate, authorize([Role.ORANG_TUA]), async (req, res) => {
+    try {
+        const grades = await ParentService.getChildGrades(req.params.studentId);
+        res.json(grades);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get('/api/parent/child/:studentId/finance', authenticate, authorize([Role.ORANG_TUA]), async (req, res) => {
+    try {
+        const finance = await ParentService.getChildFinance(req.params.studentId);
+        res.json(finance);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get('/api/parent/notifications', authenticate, authorize([Role.ORANG_TUA]), async (req: AuthRequest, res) => {
+      try {
+          const notifications = await ParentService.getNotifications(req.user!.userId);
+          res.json(notifications);
+      } catch (error: any) {
+          res.status(500).json({ error: error.message });
+      }
+  });
+
+  // Inventory Endpoints
+  app.get('/api/inventory', authenticate, async (req, res) => {
+    try {
+      const items = await InventoryService.getAllItems();
+      res.json(items);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/inventory', authenticate, authorize([Role.SUPER_ADMIN, Role.TU]), async (req, res) => {
+    try {
+      const item = await InventoryService.createItem(req.body);
+      res.json(item);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Archive & Digital Surat Endpoints
+  app.get('/api/archive', authenticate, async (req, res) => {
+    try {
+      const docs = await DocumentService.getArchive(req.query.category as string);
+      res.json(docs);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/archive/upload', authenticate, async (req: AuthRequest, res) => {
+    try {
+      const doc = await DocumentService.uploadDocument({ ...req.body, uploaderId: req.user!.userId });
+      res.json(doc);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // GPS Integrity Endpoints
+  app.post('/api/gps/log', authenticate, authorize([Role.SISWA]), async (req: AuthRequest, res) => {
+    try {
+      const student = await prisma.student.findUnique({ where: { userId: req.user!.userId } });
+      if (!student) return res.status(404).json({ error: 'Student profile not found' });
+      
+      const validation = GpsService.validateGeofence(req.body.lat, req.body.lng);
+      const log = await GpsService.logLocation(student.id, req.body);
+      
+      res.json({ log, validation });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Financial Endpoints
+  app.post('/api/finance/spp/generate', authenticate, authorize([Role.SUPER_ADMIN, Role.BENDAHARA]), async (req, res) => {
+    try {
+      const { month, year, academicYearId } = req.body;
+      const result = await FinanceService.generateMonthlySPP(month, year, academicYearId);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get('/api/finance/invoices', authenticate, async (req: AuthRequest, res) => {
+    try {
+      const { studentId, status } = req.query;
+      const where: any = {};
+      if (studentId) where.studentId = studentId;
+      if (status) where.status = status;
+      
+      // If student, only show their own invoices
+      if (req.user?.role === Role.SISWA) {
+          const student = await prisma.student.findUnique({ where: { userId: req.user.userId } });
+          if (student) where.studentId = student.id;
+      }
+
+      const invoices = await prisma.invoice.findMany({
+        where,
+        include: { student: { include: { user: true, class: true } } },
+        orderBy: { createdAt: 'desc' }
+      });
+      res.json(invoices);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/finance/pay', authenticate, async (req, res) => {
+    try {
+      const { invoiceId } = req.body;
+      const result = await FinanceService.createPaymentSession(invoiceId);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/finance/webhook/midtrans', async (req, res) => {
+    try {
+      await FinanceService.handleWebhook(req.body);
+      res.json({ status: 'OK' });
+    } catch (error: any) {
+      console.error('Webhook error:', error);
+      res.status(500).send('Internal Error');
+    }
+  });
+
+  app.get('/api/finance/report', authenticate, authorize([Role.SUPER_ADMIN, Role.BENDAHARA]), async (req, res) => {
+    try {
+      const { start, end } = req.query;
+      const result = await FinanceService.getFinancialReport(new Date(start as string), new Date(end as string));
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get('/api/finance/receipt/:invoiceId', authenticate, async (req, res) => {
+    try {
+      const buffer = await FinanceService.exportReceipt(req.params.invoiceId);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename=receipt-${req.params.invoiceId}.pdf`);
+      res.send(buffer);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/finance/accounts/init', authenticate, authorize([Role.SUPER_ADMIN]), async (req, res) => {
+      try {
+          const accounts = [
+              { code: '101', name: 'Kas/Bank', type: 'ASSET' },
+              { code: '401', name: 'Pendapatan SPP', type: 'INCOME' },
+              { code: '402', name: 'Pendapatan Uang Bangunan', type: 'INCOME' }
+          ];
+
+          for (const acc of accounts) {
+              await prisma.financialAccount.upsert({
+                  where: { code: acc.code },
+                  update: {},
+                  create: acc
+              });
+          }
+          res.json({ status: 'Accounts Initialized' });
+      } catch (error: any) {
+          res.status(500).json({ error: error.message });
+      }
+  });
+
+  // --- Intelligence Endpoints ---
+  app.post('/api/intelligence/signal/activate', authenticate, authorize([Role.SUPER_ADMIN, Role.GURU]), async (req: AuthRequest, res) => {
+    try {
+      const teacher = await prisma.teacher.findUnique({ where: { userId: req.user!.userId } });
+      if (!teacher) return res.status(404).json({ error: 'Teacher not found' });
+      
+      const session = await IntelligenceService.activateSignal(
+        teacher.id, 
+        req.body.classId, 
+        req.body.subjectId, 
+        req.body.scheduleId
+      );
+      res.json(session);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/intelligence/signal/close', authenticate, authorize([Role.SUPER_ADMIN, Role.GURU]), async (req, res) => {
+    try {
+      const session = await IntelligenceService.closeSignal(req.body.sessionId);
+      res.json(session);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/intelligence/respond', authenticate, authorize([Role.SISWA]), async (req: AuthRequest, res) => {
+    try {
+      const student = await prisma.student.findUnique({ where: { userId: req.user!.userId } });
+      if (!student) return res.status(404).json({ error: 'Student not found' });
+      
+      const result = await IntelligenceService.respondToSignal(student.id, req.body.sessionId, req.body);
+      
+      // Emit realtime update to teacher's room
+      if (result.status === 'SUCCESS') {
+        io.to(`session-${req.body.sessionId}`).emit('attendance-update', result.attendance);
+      }
+      
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get('/api/intelligence/session/:sessionId/metrics', authenticate, async (req, res) => {
+    try {
+      const metrics = await IntelligenceService.getSessionMetrics(req.params.sessionId);
+      res.json(metrics);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/intelligence/session/:sessionId/ai-insights', authenticate, async (req, res) => {
+    try {
+      const insights = await IntelligenceService.generateAiInsights(req.params.sessionId);
+      res.json({ insights });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Academic Endpoints
+  app.get('/api/timetable/:classId', authenticate, async (req, res) => {
+    try {
+      const timetable = await AcademicService.getSchedules(req.params.classId);
+      res.json(timetable);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch timetable' });
+    }
+  });
+
+  // AI Analytics Endpoints
+  app.get('/api/analytics/student/:nisn', authenticate, authorize([Role.SUPER_ADMIN, Role.GURU, Role.KEPALA_SEKOLAH]), async (req, res) => {
+    try {
+      const analysis = await AiService.analyzeStudentPerformance(req.params.nisn);
+      res.json({ analysis });
+    } catch (error) {
+      res.status(500).json({ error: 'AI analysis failed' });
+    }
+  });
+
+  // --- Vite Integration ---
+
+  if (process.env.NODE_ENV !== 'production') {
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: 'spa',
+    });
+    app.use(vite.middlewares);
+  } else {
+    const distPath = path.join(process.cwd(), 'dist');
+    app.use(express.static(distPath));
+    app.get('*', (req, res) => {
+      res.sendFile(path.join(distPath, 'index.html'));
+    });
+  }
+
+  httpServer.listen(PORT, '0.0.0.0', () => {
+    console.log(`EduNexus Alpha Server running at http://localhost:${PORT}`);
+  });
+}
+
+startServer();
