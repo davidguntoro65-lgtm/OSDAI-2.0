@@ -1,0 +1,529 @@
+# ROLE:
+Senior DevOps Architect, Senior Production Deployment Engineer, Senior Fullstack Infrastructure Architect, and Enterprise CI/CD Specialist.
+
+# TASK:
+Prepare OSDAI (Otomatisasi Sekolah Digital Berbasis Artificial Intelligent) for FULL PRODUCTION deployment on:
+
+1. LOCAL DEVELOPMENT
+   - Laragon
+   - Windows
+   - localhost
+
+2. PRODUCTION HOSTING
+   - cPanel Hosting
+   - Node.js Hosting
+   - VPS-ready architecture
+   - Cloud-ready architecture
+
+# PRIMARY DOMAIN:
+https://absen.smkn1wonogiri.sch.id
+
+# MANDATE:
+FULL VERSION.
+PRODUCTION READY.
+NO MANUAL SOURCE EDIT AFTER DEPLOY.
+AUTO ENVIRONMENT DETECTION.
+DOMAIN FLEXIBLE.
+ZERO CONFLICT.
+ZERO HARD-CODE DOMAIN.
+ZERO STATIC URL.
+GITHUB CONTINUOUS DEVELOPMENT READY.
+
+====================================================
+1. CORE DEPLOYMENT PRINCIPLE
+====================================================
+
+SYSTEM MUST:
+----------------------------------------------------
+
+✓ work in localhost
+✓ work in cPanel
+✓ work when domain changes
+✓ work when moved to subdomain
+✓ work in production without source edit
+✓ work from environment variables only
+
+====================================================
+2. ABSOLUTELY FORBIDDEN
+====================================================
+
+NEVER HARDCODE:
+----------------------------------------------------
+
+❌ localhost URLs
+❌ domain names
+❌ API URLs
+❌ websocket URLs
+❌ image paths
+❌ callback URLs
+
+====================================================
+3. ENVIRONMENT ARCHITECTURE
+====================================================
+
+ALL CONFIGURATION MUST USE:
+.env
+
+====================================================
+CREATE:
+====================================================
+
+.env.development
+.env.production
+.env.example
+
+====================================================
+4. REQUIRED ENV VARIABLES
+====================================================
+
+APP_NAME="OSDAI"
+
+APP_ENV=
+APP_URL=
+APP_PORT=
+
+DATABASE_URL=
+
+JWT_SECRET=
+JWT_REFRESH_SECRET=
+
+NEXT_PUBLIC_APP_URL=
+NEXT_PUBLIC_API_URL=
+NEXT_PUBLIC_WS_URL=
+
+EMAIL_PROVIDER=
+SMTP_HOST=
+SMTP_PORT=
+SMTP_USER=
+SMTP_PASS=
+
+RESEND_API_KEY=
+
+REDIS_URL=
+
+CLOUDINARY_CLOUD_NAME=
+CLOUDINARY_API_KEY=
+CLOUDINARY_API_SECRET=
+
+QR_SECRET=
+
+GOOGLE_MAPS_API_KEY=
+
+PUSHER_APP_ID=
+PUSHER_KEY=
+PUSHER_SECRET=
+PUSHER_CLUSTER=
+
+====================================================
+5. AUTO DOMAIN DETECTION
+====================================================
+
+MANDATORY.
+
+System MUST automatically:
+----------------------------------------------------
+
+✓ detect current domain
+✓ detect protocol
+✓ detect subdomain
+✓ generate dynamic callback URLs
+✓ generate dynamic websocket URLs
+
+====================================================
+EXAMPLE:
+====================================================
+
+localhost:
+----------------------------------------------------
+http://localhost:3000
+
+production:
+----------------------------------------------------
+https://absen.smkn1wonogiri.sch.id
+
+future domain:
+----------------------------------------------------
+https://osdai.sch.id
+
+WITHOUT source code changes.
+
+====================================================
+6. NEXT.JS CONFIGURATION
+====================================================
+
+CREATE:
+----------------------------------------------------
+
+dynamic next.config.js
+
+Features:
+----------------------------------------------------
+
+✓ image optimization
+✓ dynamic domain allowlist
+✓ environment auto-read
+✓ production optimization
+✓ standalone output
+
+====================================================
+7. BACKEND ARCHITECTURE
+====================================================
+
+USE:
+----------------------------------------------------
+
+✓ NestJS OR Express modular architecture
+✓ Prisma ORM
+✓ PostgreSQL
+✓ Redis Queue
+✓ Socket.IO
+✓ REST API modular
+
+====================================================
+8. PRODUCTION BUILD SYSTEM
+====================================================
+
+CREATE:
+----------------------------------------------------
+
+production scripts
+
+====================================================
+PACKAGE.JSON
+====================================================
+
+Scripts:
+----------------------------------------------------
+
+dev
+build
+start
+start:prod
+lint
+prisma:migrate
+prisma:generate
+seed
+backup
+
+====================================================
+9. DATABASE DEPLOYMENT
+====================================================
+
+POSTGRESQL MUST:
+----------------------------------------------------
+
+✓ auto migrate
+✓ auto generate prisma
+✓ support backup
+✓ support restore
+✓ support production pooling
+
+====================================================
+10. LARAGON SUPPORT
+====================================================
+
+SYSTEM MUST:
+----------------------------------------------------
+
+✓ work instantly in Laragon
+✓ auto connect localhost PostgreSQL
+✓ support local .env
+✓ support hot reload
+✓ support local websocket
+
+====================================================
+11. CPANEL DEPLOYMENT SUPPORT
+====================================================
+
+IMPORTANT.
+
+Prepare:
+----------------------------------------------------
+
+✓ Node.js App setup
+✓ production build folder
+✓ standalone deployment
+✓ environment variable guide
+✓ reverse proxy support
+✓ SSL support
+
+====================================================
+12. FILE STRUCTURE
+====================================================
+
+CREATE CLEAN STRUCTURE:
+----------------------------------------------------
+
+/apps
+/backend
+/frontend
+
+/prisma
+/uploads
+/logs
+/backups
+
+/docs
+/scripts
+
+====================================================
+13. GITHUB CONTINUOUS DEVELOPMENT
+====================================================
+
+VERY IMPORTANT.
+
+System MUST:
+----------------------------------------------------
+
+✓ support GitHub workflow
+✓ support pull updates
+✓ support git versioning
+✓ no source conflict after update
+✓ support modular expansion
+
+====================================================
+14. GITIGNORE
+====================================================
+
+PROTECT:
+----------------------------------------------------
+
+.env
+uploads
+logs
+node_modules
+dist
+.next
+
+====================================================
+15. AUTO API ROUTING
+====================================================
+
+FRONTEND MUST:
+----------------------------------------------------
+
+automatically read:
+NEXT_PUBLIC_API_URL
+
+NO STATIC API URL.
+
+====================================================
+16. WEBSOCKET SYSTEM
+====================================================
+
+SOCKET.IO MUST:
+----------------------------------------------------
+
+✓ auto detect ws/wss
+✓ auto reconnect
+✓ dynamic endpoint
+✓ production stable
+
+====================================================
+17. FILE STORAGE SYSTEM
+====================================================
+
+USE:
+----------------------------------------------------
+
+dynamic upload system.
+
+====================================================
+SUPPORT:
+====================================================
+
+✓ local uploads
+✓ cloud uploads
+✓ cPanel uploads
+✓ future cloud migration
+
+====================================================
+18. QR & REPORT SYSTEM
+====================================================
+
+ALL GENERATED REPORTS MUST:
+----------------------------------------------------
+
+✓ generate dynamic URL
+✓ use active domain automatically
+✓ dynamic QR verification link
+
+====================================================
+19. SSL & SECURITY
+====================================================
+
+MANDATORY:
+----------------------------------------------------
+
+✓ HTTPS ready
+✓ secure cookies
+✓ csrf protection
+✓ helmet security
+✓ rate limit
+✓ cors dynamic
+
+====================================================
+20. CORS SYSTEM
+====================================================
+
+DO NOT HARDCODE ORIGIN.
+
+CREATE:
+----------------------------------------------------
+
+dynamic origin validation.
+
+====================================================
+21. PRODUCTION PERFORMANCE
+====================================================
+
+ENABLE:
+----------------------------------------------------
+
+✓ gzip compression
+✓ lazy loading
+✓ code splitting
+✓ optimized images
+✓ production cache
+✓ Redis cache
+✓ queue optimization
+
+====================================================
+22. BACKUP SYSTEM
+====================================================
+
+CREATE:
+----------------------------------------------------
+
+automatic backup service.
+
+====================================================
+FEATURES:
+====================================================
+
+✓ database backup
+✓ upload backup
+✓ scheduled backup
+✓ restore point
+✓ backup download
+
+====================================================
+23. LOGGING SYSTEM
+====================================================
+
+CREATE:
+----------------------------------------------------
+
+centralized logging.
+
+====================================================
+STORE:
+====================================================
+
+✓ API errors
+✓ login logs
+✓ deployment logs
+✓ websocket logs
+✓ security logs
+
+====================================================
+24. DEPLOYMENT DOCUMENTATION
+====================================================
+
+AUTO GENERATE:
+----------------------------------------------------
+
+✓ local install guide
+✓ Laragon guide
+✓ cPanel guide
+✓ VPS guide
+✓ GitHub workflow guide
+✓ environment setup guide
+
+====================================================
+25. ONE CLICK DEPLOY PREPARATION
+====================================================
+
+CREATE:
+----------------------------------------------------
+
+deployment scripts.
+
+====================================================
+EXAMPLE:
+====================================================
+
+npm run setup
+npm run deploy
+npm run production
+
+====================================================
+26. ENV AUTO VALIDATION
+====================================================
+
+ON STARTUP:
+----------------------------------------------------
+
+system checks:
+✓ missing env
+✓ invalid config
+✓ invalid database
+✓ invalid redis
+✓ invalid smtp
+
+SHOW CLEAN ERROR MESSAGE.
+
+====================================================
+27. MULTI DOMAIN READY
+====================================================
+
+SYSTEM MUST SUPPORT:
+----------------------------------------------------
+
+✓ domain migration
+✓ subdomain migration
+✓ school replication
+✓ multi-instance future
+
+====================================================
+28. REAL PRODUCTION QUALITY
+====================================================
+
+VERIFY:
+----------------------------------------------------
+
+✓ no localhost dependency
+✓ no hardcoded path
+✓ no static domain
+✓ no broken websocket
+✓ no upload conflict
+✓ no routing issue
+✓ no cPanel path issue
+✓ no mixed content issue
+
+====================================================
+29. FINAL EXECUTION
+====================================================
+
+Prepare:
+----------------------------------------------------
+
+✓ local production mode
+✓ cPanel deployment mode
+✓ GitHub integration mode
+✓ scalable architecture
+✓ dynamic domain architecture
+✓ production environment system
+✓ enterprise deployment workflow
+
+ALL:
+----------------------------------------------------
+
+✓ modular
+✓ scalable
+✓ secure
+✓ production ready
+✓ future-proof
+✓ no source modification after deploy
+
+EXECUTE IMMEDIATELY.
