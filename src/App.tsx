@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Role } from '@prisma/client';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, useTime, useTransform } from 'motion/react';
 import { BrainCircuit, Lock, Loader2 } from 'lucide-react';
 import ForgotPasswordScreen from '@/components/ForgotPasswordScreen';
 
@@ -33,15 +33,59 @@ import LMSModule from '@/components/LMSModule';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-const OsdaiIcon = ({ size = 24 }: { size?: number }) => (
-  <div className="relative flex items-center justify-center">
-    <BrainCircuit size={size} className="text-white" />
-    <motion.div
-      animate={{ scale: [1, 1.6, 1], opacity: [0.6, 1, 0.6] }}
-      transition={{ duration: 2, repeat: Infinity }}
-      className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-orange-300 rounded-full blur-[1px]"
-    />
-  </div>
+// Futuristic AI logo mark — orbiting rings + neural core
+const OsdaiLogoMark = () => {
+  const time = useTime();
+  const rotate1 = useTransform(time, t => (t / 3000) * 360);
+  const rotate2 = useTransform(time, t => -(t / 4500) * 360);
+  const rotate3 = useTransform(time, t => (t / 7000) * 360);
+  return (
+    <div className="relative w-12 h-12 flex items-center justify-center">
+      {/* Outer orbit ring */}
+      <motion.div style={{ rotate: rotate1 }} className="absolute inset-0">
+        <svg viewBox="0 0 48 48" className="w-full h-full">
+          <circle cx="24" cy="24" r="22" fill="none" stroke="rgba(255,106,0,0.25)" strokeWidth="0.8" strokeDasharray="4 3" />
+          <circle cx="24" cy="2" r="2.5" fill="#FF6A00" />
+        </svg>
+      </motion.div>
+      {/* Mid orbit ring */}
+      <motion.div style={{ rotate: rotate2 }} className="absolute inset-[5px]">
+        <svg viewBox="0 0 38 38" className="w-full h-full">
+          <circle cx="19" cy="19" r="17" fill="none" stroke="rgba(255,106,0,0.18)" strokeWidth="0.7" strokeDasharray="2 4" />
+          <circle cx="19" cy="2" r="1.8" fill="rgba(255,180,60,0.9)" />
+          <circle cx="19" cy="36" r="1.8" fill="rgba(255,180,60,0.9)" />
+        </svg>
+      </motion.div>
+      {/* Inner slow ring */}
+      <motion.div style={{ rotate: rotate3 }} className="absolute inset-[10px]">
+        <svg viewBox="0 0 28 28" className="w-full h-full">
+          <circle cx="14" cy="14" r="12" fill="none" stroke="rgba(255,106,0,0.12)" strokeWidth="0.6" />
+          <circle cx="14" cy="2" r="1.5" fill="rgba(255,106,0,0.6)" />
+          <circle cx="26" cy="14" r="1.5" fill="rgba(255,106,0,0.6)" />
+          <circle cx="14" cy="26" r="1.5" fill="rgba(255,106,0,0.6)" />
+        </svg>
+      </motion.div>
+      {/* Core icon */}
+      <motion.div
+        animate={{ boxShadow: ['0 0 0px rgba(255,106,0,0.6)', '0 0 14px rgba(255,106,0,1)', '0 0 0px rgba(255,106,0,0.6)'] }}
+        transition={{ duration: 2.2, repeat: Infinity }}
+        className="relative z-10 w-7 h-7 rounded-xl flex items-center justify-center"
+        style={{ background: 'linear-gradient(135deg, #FF6A00 0%, #cc4a00 100%)' }}
+      >
+        <BrainCircuit size={14} className="text-white" strokeWidth={2.2} />
+      </motion.div>
+    </div>
+  );
+};
+
+// Scanning line that sweeps across the header
+const ScanLine = () => (
+  <motion.div
+    className="absolute left-0 right-0 h-px pointer-events-none"
+    style={{ background: 'linear-gradient(90deg, transparent 0%, rgba(255,106,0,0.6) 20%, rgba(255,180,60,0.9) 50%, rgba(255,106,0,0.6) 80%, transparent 100%)' }}
+    animate={{ top: ['0%', '100%', '0%'] }}
+    transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
+  />
 );
 
 const defaultTab = (role: string): MobileTab => {
@@ -153,87 +197,169 @@ export default function App() {
 
   if (!token || (authLoading && !user)) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden">
+      <div className="min-h-screen flex items-center justify-center p-5 relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #0a0604 0%, #130b05 50%, #0a0604 100%)' }}>
         <NeuralBackground />
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="absolute top-8 left-1/2 -translate-x-1/2 flex items-center gap-2 px-5 py-2 bg-white/40 backdrop-blur-xl border border-white/60 rounded-full shadow-sm"
-        >
-          <motion.div
-            animate={{ opacity: [1, 0.4, 1] }}
-            transition={{ duration: 2, repeat: Infinity }}
-            className="w-1.5 h-1.5 rounded-full bg-green-500"
-          />
-          <span className="text-[10px] font-black text-slate-600 uppercase tracking-[0.25em]">
-            SMK Negeri 1 Wonogiri · Sistem Online
-          </span>
-        </motion.div>
+
+        {/* Ambient glows */}
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-64 rounded-full blur-3xl" style={{ background: 'radial-gradient(circle, rgba(255,106,0,0.1) 0%, transparent 70%)' }} />
+          <div className="absolute bottom-0 left-0 w-64 h-64 rounded-full blur-3xl" style={{ background: 'radial-gradient(circle, rgba(124,58,237,0.05) 0%, transparent 70%)' }} />
+          <div className="absolute bottom-0 right-0 w-48 h-48 rounded-full blur-3xl" style={{ background: 'radial-gradient(circle, rgba(255,106,0,0.05) 0%, transparent 70%)' }} />
+        </div>
 
         <motion.div
-          initial={{ opacity: 0, scale: 0.93, y: 20 }}
+          initial={{ opacity: 0, scale: 0.93, y: 24 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           transition={{ duration: 0.5, ease: 'easeOut' }}
-          className="w-full max-w-md"
+          className="w-full max-w-sm relative z-10"
         >
-          <GlassPanel className="overflow-hidden bg-white/45 border-white/60 shadow-2xl">
-            <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-10 text-white text-center relative overflow-hidden">
-              <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_-20%,rgba(255,106,0,0.3),transparent_70%)]" />
-              <div
-                className="absolute inset-0 opacity-5"
-                style={{
-                  backgroundImage: 'linear-gradient(rgba(255,255,255,0.15) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.15) 1px, transparent 1px)',
-                  backgroundSize: '32px 32px',
-                }}
-              />
-              <div className="relative z-10">
+          <GlassPanel className="overflow-hidden border-white/10 shadow-2xl" style={{ background: 'rgba(255,255,255,0.04)', backdropFilter: 'blur(24px)', border: '1px solid rgba(255,255,255,0.08)' }}>
+
+            {/* ── Futuristic AI Header ── */}
+            <div
+              className="relative px-7 pt-6 pb-5 text-white overflow-hidden"
+              style={{ background: 'linear-gradient(160deg, #0d0804 0%, #1a0d06 55%, #0f0a05 100%)' }}
+            >
+              {/* Fine grid */}
+              <div className="absolute inset-0 opacity-[0.04]" style={{
+                backgroundImage: 'linear-gradient(rgba(255,255,255,1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,1) 1px, transparent 1px)',
+                backgroundSize: '20px 20px',
+              }} />
+              {/* Radial orange glow */}
+              <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse 80% 100% at 50% 0%, rgba(255,106,0,0.22) 0%, transparent 70%)' }} />
+              {/* Corner accent lines */}
+              <div className="absolute top-0 left-0 w-8 h-8 border-t border-l border-orange-500/40" />
+              <div className="absolute top-0 right-0 w-8 h-8 border-t border-r border-orange-500/40" />
+              <div className="absolute bottom-0 left-0 w-8 h-8 border-b border-l border-orange-500/20" />
+              <div className="absolute bottom-0 right-0 w-8 h-8 border-b border-r border-orange-500/20" />
+              {/* Scan line */}
+              <ScanLine />
+
+              {/* Content */}
+              <div className="relative z-10 flex items-center gap-3.5">
+                {/* Logo mark */}
                 <motion.div
-                  animate={{ boxShadow: ['0 0 0px rgba(255,106,0,0.5)', '0 0 30px rgba(255,106,0,0.8)', '0 0 0px rgba(255,106,0,0.5)'] }}
-                  transition={{ duration: 2.5, repeat: Infinity }}
-                  className="w-16 h-16 bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl mx-auto flex items-center justify-center mb-6 shadow-2xl"
+                  initial={{ opacity: 0, scale: 0.6 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.6, ease: 'easeOut' }}
                 >
-                  <OsdaiIcon size={30} />
+                  <OsdaiLogoMark />
                 </motion.div>
-                <h1 className="text-3xl font-black tracking-tight mb-1">OSDAI</h1>
-                <p className="text-[9px] font-black text-white/40 uppercase tracking-[0.3em] leading-relaxed">
-                  Otomatisasi Sekolah Digital<br />Berbasis Artificial Intelligent
-                </p>
+
+                {/* Text block */}
+                <motion.div
+                  initial={{ opacity: 0, x: -12 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.5, delay: 0.15 }}
+                >
+                  <div className="flex items-baseline gap-2">
+                    <h1 className="text-2xl font-black tracking-tight text-white leading-none">OSDAI</h1>
+                    <motion.span
+                      animate={{ opacity: [0.4, 1, 0.4] }}
+                      transition={{ duration: 1.8, repeat: Infinity }}
+                      className="text-[9px] font-black tracking-widest px-1.5 py-0.5 rounded"
+                      style={{ background: 'rgba(255,106,0,0.2)', color: '#FF6A00', border: '1px solid rgba(255,106,0,0.35)' }}
+                    >
+                      v2.0
+                    </motion.span>
+                  </div>
+                  <p className="text-[7.5px] font-bold uppercase tracking-[0.16em] mt-1 whitespace-nowrap" style={{ color: 'rgba(255,255,255,0.28)' }}>
+                    Otomatisasi Sekolah Digital · AI
+                  </p>
+                  <p className="text-[7px] font-black mt-0.5 whitespace-nowrap" style={{ color: 'rgba(255,106,0,0.45)', letterSpacing: '0.12em' }}>
+                    SMK Negeri 1 Wonogiri
+                  </p>
+                </motion.div>
+
+                {/* Live indicator */}
+                <div className="ml-auto flex flex-col items-end gap-1">
+                  <div className="flex items-center gap-1.5">
+                    <motion.div
+                      animate={{ scale: [1, 1.6, 1], opacity: [1, 0.3, 1] }}
+                      transition={{ duration: 1.4, repeat: Infinity }}
+                      className="w-1.5 h-1.5 rounded-full bg-green-400"
+                    />
+                    <span className="text-[8px] font-black uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.25)' }}>LIVE</span>
+                  </div>
+                  <motion.div
+                    animate={{ opacity: [0.2, 0.7, 0.2] }}
+                    transition={{ duration: 3, repeat: Infinity }}
+                    className="text-[7px] font-bold tabular-nums"
+                    style={{ color: 'rgba(255,106,0,0.5)', fontFamily: 'monospace' }}
+                  >
+                    SYS.OK
+                  </motion.div>
+                </div>
+              </div>
+
+              {/* Bottom neural nodes row */}
+              <div className="relative z-10 flex items-center gap-1.5 mt-4">
+                {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
+                  <motion.div
+                    key={i}
+                    className="flex-1 h-0.5 rounded-full"
+                    style={{ background: 'rgba(255,106,0,0.12)' }}
+                    animate={{ background: ['rgba(255,106,0,0.08)', 'rgba(255,106,0,0.45)', 'rgba(255,106,0,0.08)'] }}
+                    transition={{ duration: 2.5, repeat: Infinity, delay: i * 0.18, ease: 'easeInOut' }}
+                  />
+                ))}
+                <motion.span
+                  animate={{ opacity: [0.3, 0.8, 0.3] }}
+                  transition={{ duration: 2.5, repeat: Infinity }}
+                  className="text-[7px] font-black tabular-nums ml-1"
+                  style={{ color: 'rgba(255,106,0,0.5)', fontFamily: 'monospace', whiteSpace: 'nowrap' }}
+                >
+                  AI READY
+                </motion.span>
               </div>
             </div>
 
-            <CardContent className="p-10">
-              <p className="text-center text-xs font-bold text-slate-500 mb-8 leading-relaxed">
-                Sistem Operasional Sekolah Berbasis<br />Kecerdasan Buatan
-              </p>
+            <div className="px-6 py-5">
 
-              <form onSubmit={handleLogin} className="space-y-5">
-                <div className="space-y-2">
-                  <label className="text-[10px] uppercase font-black tracking-widest text-slate-400 ml-1">
+              <form onSubmit={handleLogin} className="space-y-4">
+                {/* Email */}
+                <div>
+                  <label className="text-[9px] uppercase font-black tracking-widest mb-1.5 block" style={{ color: 'rgba(255,255,255,0.35)' }}>
                     Alamat Surel
                   </label>
-                  <Input
+                  <input
                     type="email"
                     value={loginEmail}
                     onChange={e => setLoginEmail(e.target.value)}
                     placeholder="nama@smk.id"
                     autoComplete="username"
                     required
-                    className="h-14 rounded-2xl border-white/30 bg-white/30 backdrop-blur-md font-bold text-slate-800 placeholder:text-slate-400 focus:border-orange-300"
+                    className="w-full h-12 px-4 rounded-2xl text-sm font-bold text-white placeholder:font-normal outline-none transition-all"
+                    style={{
+                      background: 'rgba(255,255,255,0.06)',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      caretColor: '#FF6A00',
+                    }}
+                    onFocus={e => (e.currentTarget.style.borderColor = 'rgba(255,106,0,0.5)')}
+                    onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)')}
                   />
                 </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] uppercase font-black tracking-widest text-slate-400 ml-1">
+
+                {/* Password */}
+                <div>
+                  <label className="text-[9px] uppercase font-black tracking-widest mb-1.5 block" style={{ color: 'rgba(255,255,255,0.35)' }}>
                     Kata Sandi
                   </label>
-                  <Input
+                  <input
                     type="password"
                     value={loginPassword}
                     onChange={e => setLoginPassword(e.target.value)}
                     placeholder="••••••••"
                     autoComplete="current-password"
                     required
-                    className="h-14 rounded-2xl border-white/30 bg-white/30 backdrop-blur-md font-bold text-slate-800 placeholder:text-slate-400 focus:border-orange-300"
+                    className="w-full h-12 px-4 rounded-2xl text-sm font-bold text-white placeholder:font-normal outline-none transition-all"
+                    style={{
+                      background: 'rgba(255,255,255,0.06)',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      caretColor: '#FF6A00',
+                    }}
+                    onFocus={e => (e.currentTarget.style.borderColor = 'rgba(255,106,0,0.5)')}
+                    onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)')}
                   />
                 </div>
 
@@ -243,62 +369,78 @@ export default function App() {
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: 'auto' }}
                       exit={{ opacity: 0, height: 0 }}
-                      className="text-sm font-bold text-red-600 bg-red-50 border border-red-200 rounded-2xl px-4 py-3 text-center"
+                      className="text-xs font-bold px-4 py-3 rounded-2xl text-center"
+                      style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', color: '#f87171' }}
                     >
                       {loginError}
                     </motion.div>
                   )}
                 </AnimatePresence>
 
-                <Button
+                {/* Login Button */}
+                <motion.button
                   type="submit"
                   disabled={authLoading}
-                  className="w-full h-14 rounded-2xl bg-gradient-to-r from-slate-900 to-slate-800 text-white text-sm font-black shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all duration-200 disabled:opacity-60"
+                  whileTap={{ scale: 0.98 }}
+                  className="w-full h-12 rounded-2xl text-white text-sm font-black flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                  style={{ background: 'linear-gradient(135deg, #FF6A00 0%, #cc4a00 100%)', boxShadow: '0 4px 24px rgba(255,106,0,0.35)' }}
                 >
                   {authLoading ? (
-                    <><Loader2 size={18} className="animate-spin mr-2" /> Memverifikasi...</>
+                    <><Loader2 size={16} className="animate-spin" /> Memverifikasi...</>
                   ) : (
-                    <><Lock size={16} className="mr-2" /> MASUK KE SISTEM</>
+                    <><Lock size={15} /> MASUK KE SISTEM</>
                   )}
-                </Button>
+                </motion.button>
 
-                <div className="text-center pt-1">
+                {/* Lupa Password */}
+                <div className="text-center">
                   <button
                     type="button"
                     onClick={() => setShowForgotPassword(true)}
-                    className="text-[11px] font-black text-orange-500 hover:text-orange-400 transition-colors underline-offset-2 hover:underline"
+                    className="text-[11px] font-black transition-all hover:opacity-70"
+                    style={{ color: '#FF6A00' }}
                   >
                     Lupa Password?
                   </button>
                 </div>
               </form>
 
-              <div className="mt-6 pt-5 border-t border-white/20">
-                <p className="text-center text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3">Akun Test</p>
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { label: 'Super Admin', email: 'admin@smk.id', pass: 'password123' },
-                    { label: 'Guru', email: 'guru@smk.id', pass: 'password123' },
-                    { label: 'Siswa', email: 'siswa@smk.id', pass: 'password123' },
-                  ].map(acc => (
-                    <button
-                      key={acc.email}
-                      type="button"
-                      onClick={() => { setLoginEmail(acc.email); setLoginPassword(acc.pass); }}
-                      className="text-left px-3 py-2 rounded-xl text-[9px] font-black text-slate-600 hover:text-slate-800 hover:bg-orange-50 transition-all border border-white/40"
-                      style={{ background: 'rgba(255,255,255,0.4)' }}
-                    >
-                      <p className="text-orange-500">{acc.label}</p>
-                      <p className="truncate text-slate-500">{acc.email}</p>
-                    </button>
-                  ))}
-                </div>
+              {/* Divider */}
+              <div className="flex items-center gap-3 my-5">
+                <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.07)' }} />
+                <span className="text-[8px] font-black uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.2)' }}>Akun Test</span>
+                <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.07)' }} />
               </div>
 
-              <p className="text-center text-[10px] font-black text-slate-400 mt-5 uppercase tracking-widest">
-                OSDAI · SMK Negeri 1 Wonogiri
+              {/* Test Account Chips */}
+              <div className="grid grid-cols-3 gap-2 mb-5">
+                {[
+                  { label: 'Admin', email: 'admin@smk.id', pass: 'password123', color: '#FF6A00' },
+                  { label: 'Guru', email: 'guru@smk.id', pass: 'password123', color: '#f59e0b' },
+                  { label: 'Siswa', email: 'siswa@smk.id', pass: 'password123', color: '#22c55e' },
+                ].map(acc => (
+                  <motion.button
+                    key={acc.email}
+                    type="button"
+                    whileTap={{ scale: 0.94 }}
+                    onClick={() => { setLoginEmail(acc.email); setLoginPassword(acc.pass); }}
+                    className="flex flex-col items-center py-2.5 px-2 rounded-xl transition-all"
+                    style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid rgba(255,255,255,0.08)` }}
+                    onMouseEnter={e => (e.currentTarget.style.borderColor = `${acc.color}40`)}
+                    onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)')}
+                  >
+                    <div className="w-1.5 h-1.5 rounded-full mb-1.5" style={{ background: acc.color }} />
+                    <p className="text-[10px] font-black" style={{ color: acc.color }}>{acc.label}</p>
+                    <p className="text-[7px] font-bold mt-0.5 truncate w-full text-center" style={{ color: 'rgba(255,255,255,0.25)' }}>{acc.email.split('@')[0]}</p>
+                  </motion.button>
+                ))}
+              </div>
+
+              {/* Footer */}
+              <p className="text-center text-[8px] font-black uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.12)' }}>
+                OSDAI · SMK Negeri 1 Wonogiri · 2026
               </p>
-            </CardContent>
+            </div>
           </GlassPanel>
         </motion.div>
       </div>
