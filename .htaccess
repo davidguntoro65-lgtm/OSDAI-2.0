@@ -1,0 +1,15 @@
+# OSDAI — Phusion Passenger configuration for cPanel
+# Place this file in the application root directory.
+#
+# Passenger automatically detects app.js as the entry point
+# because "main": "app.js" is set in package.json.
+# These directives ensure all traffic is routed through the Node.js app.
+
+PassengerEnabled on
+PassengerNodejs /usr/local/bin/node
+
+# Route all requests to the Node.js app (Passenger handles this).
+# The Express server inside app.js serves /api routes and /dist static files.
+RewriteEngine On
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^(.*)$ app.js [QSA,L]

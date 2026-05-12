@@ -1,0 +1,39 @@
+# ROLE: SENIOR FULLSTACK JS & DEVOPS ARCHITECT
+# CONTEXT: RESTRUCTURING FOR CPANEL DEPLOYMENT (PHUSION PASSENGER)
+
+Please restructure this project to fix critical deployment issues found in production. The app must run on a cPanel Shared Hosting environment using Node.js and PostgreSQL.
+
+### 1. ARCHITECTURE REQUIREMENTS (PRECISION)
+- **Root-Level `app.js`**: Create a robust entry point for Phusion Passenger. It must:
+  - Initialize Express or the current backend framework.
+  - Bridge the API routes (e.g., `/api`).
+  - Serve static files from the `/dist` directory.
+  - Handle SPA routing (fallback to `dist/index.html`).
+- **Prisma Configuration**: Ensure `schema.prisma` uses `provider = "postgresql"` and `url = env("DATABASE_URL")`.
+- **Package.json**: Update scripts to include:
+  - `"build": "vite build"`
+  - `"start": "node app.js"`
+  - Ensure all production dependencies are in "dependencies", not "devDependencies".
+
+### 2. FIXING CRITICAL BUGS IDENTIFIED IN AUDIT
+- **MIME Type Error**: Ensure the production `index.html` (inside `dist`) DOES NOT reference `.tsx` files. It must only reference compiled `.js` assets.
+- **API Endpoint Logic**: In `app.js` and frontend services, ensure the API URL is dynamic. Use relative paths `/api/...` or detect `location.hostname` to avoid hardcoded `localhost:3000`.
+- **Environment Handling**: The app must be able to read environment variables from both `.env` and `process.env` (for cPanel runtime).
+
+### 3. MANDATORY PROJECT STRUCTURE
+/ (root)
+├── app.js (The "Key" - must handle both API & Static Hosting)
+├── dist/ (Target folder for Vite build)
+├── prisma/ (PostgreSQL schema)
+├── server/ (Backend/API logic)
+├── src/ (Frontend/React source)
+├── package.json
+└── .env (Template for Database credentials)
+
+### 4. OUTPUT EXPECTATION
+Refactor the code so that after a `git pull` on the server, running these commands makes the app live instantly:
+1. `npm install && npm run build`
+2. `npx prisma generate && npx prisma db push`
+3. (App is then served by `app.js` via Passenger)
+
+DO NOT use placeholder "It works!" scripts. Use the actual application logic.
