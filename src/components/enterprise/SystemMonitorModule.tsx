@@ -3,7 +3,7 @@ import {
   Server, Activity, Database, Cpu, HardDrive, Wifi, Globe,
   AlertTriangle, CheckCircle2, RefreshCcw, Clock, Zap,
   ArrowUpRight, TrendingUp, Eye, Shield, Key, Lock,
-  Monitor, Package, BarChart3, Hash
+  Monitor, Package, BarChart3, Hash, RotateCcw, Users, X
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 
@@ -409,14 +409,42 @@ export function InventoryModule({ authToken }: { authToken: string }) {
 }
 
 export function BackupRestoreModule({ authToken }: { authToken: string }) {
+  const [confirm, setConfirm] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  const handleReset = async () => {
+    setLoading(true);
+    setResult(null);
+    try {
+      const res = await fetch('/api/admin/reset-demo', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${authToken}` },
+      });
+      const data = await res.json();
+      if (data.success) {
+        setResult({ success: true, message: `3 akun berhasil direset ke password123 (${new Date(data.resetAt).toLocaleString('id-ID')})` });
+      } else {
+        setResult({ success: false, message: data.error || 'Reset gagal' });
+      }
+    } catch {
+      setResult({ success: false, message: 'Koneksi gagal, coba lagi' });
+    } finally {
+      setLoading(false);
+      setConfirm(false);
+    }
+  };
+
   const backups = [
     { id: 1, name: 'backup_db_2026-05-11_01-00.sql.gz', size: '4.2 MB', created: '2026-05-11 01:00', type: 'AUTO', status: 'ok' },
     { id: 2, name: 'backup_db_2026-05-10_01-00.sql.gz', size: '4.1 MB', created: '2026-05-10 01:00', type: 'AUTO', status: 'ok' },
     { id: 3, name: 'backup_db_2026-05-09_manual.sql.gz', size: '4.0 MB', created: '2026-05-09 14:30', type: 'MANUAL', status: 'ok' },
     { id: 4, name: 'backup_db_2026-05-08_01-00.sql.gz', size: '3.9 MB', created: '2026-05-08 01:00', type: 'AUTO', status: 'ok' },
   ];
+
   return (
     <div className="p-6 space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-lg font-black" style={{ color: C.text }}>Backup & Restore</h1>
@@ -426,11 +454,86 @@ export function BackupRestoreModule({ authToken }: { authToken: string }) {
           <RefreshCcw size={12} /> Backup Sekarang
         </button>
       </div>
+
+      {/* Reset Demo Data Card */}
+      <div className="rounded-xl p-5" style={{ background: '#FFFBEB', border: '1px solid #FDE68A' }}>
+        <div className="flex items-start gap-4">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: '#FEF3C7' }}>
+            <RotateCcw size={18} style={{ color: '#D97706' }} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-black" style={{ color: '#92400E' }}>Reset Data Demo</p>
+            <p className="text-xs mt-0.5" style={{ color: '#B45309' }}>
+              Kembalikan 3 akun uji coba ke kondisi awal dengan password default.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {[
+                { label: 'Admin', email: 'admin@smk.id' },
+                { label: 'Guru', email: 'guru@smk.id' },
+                { label: 'Siswa', email: 'siswa@smk.id' },
+              ].map(a => (
+                <div key={a.email} className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold" style={{ background: '#FEF3C7', color: '#92400E' }}>
+                  <Users size={10} />
+                  {a.label} — <span className="font-mono">{a.email}</span>
+                </div>
+              ))}
+            </div>
+            <p className="text-[10px] mt-2" style={{ color: '#B45309' }}>
+              Password baru: <span className="font-mono font-bold">password123</span>
+            </p>
+
+            {result && (
+              <div className={`mt-3 flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold`}
+                style={{ background: result.success ? '#F0FDF4' : '#FEF2F2', color: result.success ? '#15803D' : '#DC2626' }}>
+                {result.success ? <CheckCircle2 size={13} /> : <AlertTriangle size={13} />}
+                {result.message}
+              </div>
+            )}
+          </div>
+          <div className="flex-shrink-0">
+            {!confirm ? (
+              <button
+                onClick={() => { setConfirm(true); setResult(null); }}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold"
+                style={{ background: '#D97706', color: '#fff' }}
+              >
+                <RotateCcw size={12} /> Reset Akun
+              </button>
+            ) : (
+              <div className="flex flex-col gap-2 items-end">
+                <p className="text-[10px] font-bold text-right" style={{ color: '#92400E' }}>Yakin reset?</p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setConfirm(false)}
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold"
+                    style={{ background: '#F3F4F6', color: C.textMuted }}
+                  >
+                    <X size={11} /> Batal
+                  </button>
+                  <button
+                    onClick={handleReset}
+                    disabled={loading}
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-white disabled:opacity-60"
+                    style={{ background: '#DC2626' }}
+                  >
+                    {loading ? <RefreshCcw size={11} className="animate-spin" /> : <RotateCcw size={11} />}
+                    {loading ? 'Mereset...' : 'Ya, Reset'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Metrics */}
       <div className="grid grid-cols-3 gap-4">
         <MetricCard label="Total Backup" value={backups.length} icon={Database} color="#6366f1" />
         <MetricCard label="Backup Terbaru" value="1 jam lalu" icon={Clock} color="#10B981" />
         <MetricCard label="Total Size" value="16.2 MB" icon={HardDrive} color={C.primary} />
       </div>
+
+      {/* Backup list */}
       <div className="rounded-xl overflow-hidden" style={{ background: C.card, border: `1px solid ${C.border}` }}>
         <div className="px-4 py-3 border-b" style={{ borderColor: C.border }}>
           <p className="text-sm font-bold" style={{ color: C.text }}>Daftar Backup</p>

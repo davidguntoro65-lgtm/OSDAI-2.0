@@ -1371,6 +1371,34 @@ async function startServer() {
     }
   });
 
+  // POST /api/admin/reset-demo — reset test accounts to seed defaults (SUPER_ADMIN only)
+  app.post('/api/admin/reset-demo', authenticate, authorize([Role.SUPER_ADMIN]), async (_req, res) => {
+    try {
+      const { AuthService } = await import('./src/services/auth.js');
+      const hashedPassword = await AuthService.hashPassword('password123');
+
+      const accounts = [
+        { email: 'admin@smk.id', name: 'Super Admin', role: Role.SUPER_ADMIN },
+        { email: 'guru@smk.id',  name: 'Guru Demo',   role: Role.GURU },
+        { email: 'siswa@smk.id', name: 'Siswa Demo',  role: Role.SISWA },
+      ];
+
+      const results: { email: string; status: string }[] = [];
+      for (const acc of accounts) {
+        await prisma.user.upsert({
+          where: { email: acc.email },
+          update: { password: hashedPassword, name: acc.name, deletedAt: null, archivedAt: null },
+          create: { email: acc.email, password: hashedPassword, name: acc.name, role: acc.role },
+        });
+        results.push({ email: acc.email, status: 'RESET' });
+      }
+
+      res.json({ success: true, results, resetAt: new Date().toISOString() });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // ─── DEMO MODE API ────────────────────────────────────────────────────────
 
   /** GET /api/demo/status — public, returns demo mode state */
