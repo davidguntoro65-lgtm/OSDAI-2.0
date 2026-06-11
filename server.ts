@@ -169,8 +169,32 @@ async function startServer() {
     }
   });
 
-  app.get('/api/auth/me', authenticate, (req: AuthRequest, res) => {
-    res.json(req.user);
+  app.get('/api/auth/me', authenticate, async (req: AuthRequest, res) => {
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: req.user!.userId },
+        select: { id: true, email: true, name: true, role: true, avatarUrl: true, theme: true, createdAt: true },
+      });
+      if (!user) return res.status(404).json({ error: 'User not found' });
+      res.json(user);
+    } catch {
+      res.status(500).json({ error: 'Server error' });
+    }
+  });
+
+  app.patch('/api/auth/preferences', authenticate, async (req: AuthRequest, res) => {
+    try {
+      const { theme } = req.body;
+      if (!['light', 'dark'].includes(theme)) return res.status(400).json({ error: 'Invalid theme value' });
+      const updated = await prisma.user.update({
+        where: { id: req.user!.userId },
+        data: { theme },
+        select: { id: true, theme: true },
+      });
+      res.json(updated);
+    } catch {
+      res.status(500).json({ error: 'Server error' });
+    }
   });
 
   // ── OTP / Forgot Password Routes ─────────────────────────────────

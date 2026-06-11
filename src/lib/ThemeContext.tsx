@@ -6,16 +6,18 @@ interface ThemeCtx {
   theme: Theme;
   isDark: boolean;
   toggle: () => void;
+  setTheme: (t: Theme) => void;
 }
 
 const ThemeContext = createContext<ThemeCtx>({
   theme: 'light',
   isDark: false,
   toggle: () => {},
+  setTheme: () => {},
 });
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<Theme>(() => {
+  const [theme, setThemeState] = useState<Theme>(() => {
     const saved = localStorage.getItem('osdai_theme') as Theme | null;
     return saved ?? 'light';
   });
@@ -25,10 +27,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('osdai_theme', theme);
   }, [theme]);
 
-  const toggle = () => setTheme(t => (t === 'light' ? 'dark' : 'light'));
+  const toggle = () => setThemeState(t => (t === 'light' ? 'dark' : 'light'));
+  const setTheme = (t: Theme) => setThemeState(t);
 
   return (
-    <ThemeContext.Provider value={{ theme, isDark: theme === 'dark', toggle }}>
+    <ThemeContext.Provider value={{ theme, isDark: theme === 'dark', toggle, setTheme }}>
       {children}
     </ThemeContext.Provider>
   );

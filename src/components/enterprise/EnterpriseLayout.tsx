@@ -365,6 +365,16 @@ export default function EnterpriseLayout({ user, authToken, onLogout, onSwitchMo
   const defaultModule: EnterpriseModule = 'dashboard';
   const { isDark, toggle: toggleTheme } = useTheme();
 
+  const handleThemeToggle = () => {
+    const newTheme = isDark ? 'light' : 'dark';
+    toggleTheme();
+    fetch('/api/auth/preferences', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
+      body: JSON.stringify({ theme: newTheme }),
+    }).catch(() => {});
+  };
+
   const [activeModule, setActiveModule] = useState<EnterpriseModule>(defaultModule);
   const [collapsed, setCollapsed] = useState(false);
   const [search, setSearch] = useState('');
@@ -556,7 +566,7 @@ export default function EnterpriseLayout({ user, authToken, onLogout, onSwitchMo
 
           {/* Dark / Light toggle */}
           <button
-            onClick={toggleTheme}
+            onClick={handleThemeToggle}
             title={isDark ? 'Beralih ke Mode Terang' : 'Beralih ke Mode Gelap'}
             className="w-8 h-8 flex items-center justify-center rounded-lg transition-all flex-shrink-0"
             style={{ background: C.bg, border: `1px solid ${C.border}`, color: C.textMuted }}

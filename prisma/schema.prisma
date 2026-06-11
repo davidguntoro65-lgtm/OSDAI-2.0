@@ -55,6 +55,7 @@ model User {
   otpSecret       String?
   resetToken      String?
   resetTokenExpiry DateTime?
+  theme           String    @default("light")
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   deletedAt       DateTime?

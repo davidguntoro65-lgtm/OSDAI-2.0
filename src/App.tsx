@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Role } from '@prisma/client';
+import { useTheme, type Theme } from '@/lib/ThemeContext';
 import { motion, AnimatePresence, useTime, useTransform } from 'motion/react';
 import { BrainCircuit, Lock, Loader2 } from 'lucide-react';
 import DemoBanner from '@/components/DemoBanner';
@@ -117,6 +118,7 @@ function toMobileTab(tab: string): MobileTab {
 type AppMode = 'pending' | 'mobile' | 'web';
 
 export default function App() {
+  const { setTheme } = useTheme();
   const [activeTab, setActiveTab] = useState<MobileTab>('beranda');
   const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
   const [user, setUser] = useState<any>(null);
@@ -144,6 +146,7 @@ export default function App() {
       if (res.ok) {
         const userData = await res.json();
         setUser(userData);
+        if (userData.theme) setTheme(userData.theme as Theme);
         setActiveTab(defaultTab(userData.role));
       } else {
         handleLogout();
@@ -170,6 +173,7 @@ export default function App() {
         localStorage.setItem('token', data.accessToken);
         setToken(data.accessToken);
         setUser(data.user);
+        if (data.user.theme) setTheme(data.user.theme as Theme);
         setActiveTab(defaultTab(data.user.role));
       } else {
         setLoginError(data.error || 'Email atau kata sandi tidak valid.');
