@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { BarChart3, Download, Printer, RefreshCcw, Filter, CheckCircle2, AlertTriangle, Clock, X } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
-const C = { primary: '#FF6A00', bg: '#F5F7FA', card: '#FFFFFF', border: '#E5E7EB', text: '#111827', textMuted: '#6B7280', textSub: '#374151' };
+import { C } from '@/lib/themeC';
 
 export default function GuruRekap({ authToken }: { authToken: string }) {
   const [courses, setCourses] = useState<any[]>([]);

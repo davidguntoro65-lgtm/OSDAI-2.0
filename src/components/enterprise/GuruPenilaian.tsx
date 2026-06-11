@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Award, Plus, Save, Printer, CheckCircle2, X, Loader2 } from 'lucide-react';
 
-const C = { primary: '#FF6A00', bg: '#F5F7FA', card: '#FFFFFF', border: '#E5E7EB', text: '#111827', textMuted: '#6B7280', textSub: '#374151' };
+import { C } from '@/lib/themeC';
 
 const gradeColor = (v: number) => {
   if (v >= 90) return '#10B981';

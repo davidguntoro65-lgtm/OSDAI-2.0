@@ -7,7 +7,7 @@ import {
   FileText, MessageSquare, ChevronRight
 } from 'lucide-react';
 
-const C = { primary: '#FF6A00', bg: '#F5F7FA', card: '#FFFFFF', border: '#E5E7EB', text: '#111827', textMuted: '#6B7280', textSub: '#374151' };
+import { C } from '@/lib/themeC';
 
 const KpiCard = ({ label, value, icon: Icon, color, sub }: any) => (
   <div className="rounded-xl p-4 flex flex-col gap-3" style={{ background: C.card, border: `1px solid ${C.border}`, boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>

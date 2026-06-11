@@ -8,9 +8,11 @@ import {
   Layers, FolderOpen, Lock, Eye, Wifi, Package, Zap,
   ClipboardList, TrendingUp, MessageSquare, Award, Clock,
   RefreshCcw, ChevronLeft, User, Globe, AlertTriangle,
-  CheckCircle2, Monitor
+  CheckCircle2, Monitor, Sun, Moon
 } from 'lucide-react';
 import DemoBanner from '@/components/DemoBanner';
+import { useTheme } from '@/lib/ThemeContext';
+import { C } from '@/lib/themeC';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 export type EnterpriseModule =
@@ -145,19 +147,6 @@ const GURU_SIDEBAR: SidebarGroup[] = [
 const ADMIN_ROLES = ['SUPER_ADMIN', 'TU', 'BK', 'BENDAHARA'];
 const isAdminRole = (role: string) => ADMIN_ROLES.includes(role);
 
-// ── Color palette ─────────────────────────────────────────────────────────────
-const C = {
-  primary: '#FF6A00',
-  bg: '#F5F7FA',
-  sidebar: '#FFFFFF',
-  header: '#FFFFFF',
-  border: '#E5E7EB',
-  text: '#111827',
-  textMuted: '#6B7280',
-  textSub: '#374151',
-  active: '#FFF4ED',
-  activeBorder: '#FF6A00',
-};
 
 // ── OsdaiLogo (compact enterprise version) ────────────────────────────────────
 const OsdaiLogo = ({ collapsed }: { collapsed: boolean }) => (
@@ -209,7 +198,7 @@ const SidebarGroupComp = ({
                 background: active ? C.active : 'transparent',
                 color: active ? C.primary : C.textMuted,
               }}
-              onMouseEnter={e => { if (!active) (e.currentTarget as HTMLElement).style.background = '#F9FAFB'; }}
+              onMouseEnter={e => { if (!active) (e.currentTarget as HTMLElement).style.background = C.hover; }}
               onMouseLeave={e => { if (!active) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
             >
               <Icon size={16} />
@@ -256,7 +245,7 @@ const SidebarGroupComp = ({
                     fontWeight: active ? 700 : 500,
                     borderLeft: active ? `2px solid ${C.primary}` : '2px solid transparent',
                   }}
-                  onMouseEnter={e => { if (!active) { (e.currentTarget as HTMLElement).style.background = '#F9FAFB'; } }}
+                  onMouseEnter={e => { if (!active) { (e.currentTarget as HTMLElement).style.background = C.hover; } }}
                   onMouseLeave={e => { if (!active) { (e.currentTarget as HTMLElement).style.background = 'transparent'; } }}
                 >
                   <Icon size={15} />
@@ -291,7 +280,7 @@ const NotifPanel = ({ onClose }: { onClose: () => void }) => {
       exit={{ opacity: 0, y: 8, scale: 0.97 }}
       transition={{ duration: 0.15 }}
       className="absolute top-full right-0 mt-2 w-80 rounded-xl shadow-xl border z-50 overflow-hidden"
-      style={{ background: '#fff', borderColor: C.border }}
+      style={{ background: C.card, borderColor: C.border }}
     >
       <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: C.border }}>
         <span className="text-sm font-bold" style={{ color: C.text }}>Notifikasi</span>
@@ -300,7 +289,7 @@ const NotifPanel = ({ onClose }: { onClose: () => void }) => {
       {items.map((n, i) => {
         const Icon = n.icon;
         return (
-          <div key={i} className="flex items-start gap-3 px-4 py-3 border-b hover:bg-gray-50 cursor-pointer transition-colors" style={{ borderColor: '#F3F4F6' }}>
+          <div key={i} className="flex items-start gap-3 px-4 py-3 border-b cursor-pointer transition-colors" style={{ borderColor: C.border }}>
             <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5" style={{ background: `${n.color}15` }}>
               <Icon size={14} style={{ color: n.color }} />
             </div>
@@ -326,7 +315,7 @@ const ProfileDropdown = ({ user, onLogout, onClose }: { user: any; onLogout: () 
     exit={{ opacity: 0, y: 8, scale: 0.97 }}
     transition={{ duration: 0.15 }}
     className="absolute top-full right-0 mt-2 w-64 rounded-xl shadow-xl border z-50 overflow-hidden"
-    style={{ background: '#fff', borderColor: C.border }}
+    style={{ background: C.card, borderColor: C.border }}
   >
     <div className="px-4 py-3 border-b" style={{ borderColor: C.border }}>
       <div className="flex items-center gap-3">
@@ -374,6 +363,7 @@ export default function EnterpriseLayout({ user, authToken, onLogout, onSwitchMo
   const isAdmin = isAdminRole(role);
   const sidebar = isAdmin ? ADMIN_SIDEBAR : GURU_SIDEBAR;
   const defaultModule: EnterpriseModule = 'dashboard';
+  const { isDark, toggle: toggleTheme } = useTheme();
 
   const [activeModule, setActiveModule] = useState<EnterpriseModule>(defaultModule);
   const [collapsed, setCollapsed] = useState(false);
@@ -459,7 +449,7 @@ export default function EnterpriseLayout({ user, authToken, onLogout, onSwitchMo
                 fontWeight: activeModule === 'dashboard' ? 700 : 500,
                 borderLeft: activeModule === 'dashboard' ? `2px solid ${C.primary}` : '2px solid transparent',
               }}
-              onMouseEnter={e => { if (activeModule !== 'dashboard') (e.currentTarget as HTMLElement).style.background = '#F9FAFB'; }}
+              onMouseEnter={e => { if (activeModule !== 'dashboard') (e.currentTarget as HTMLElement).style.background = C.hover; }}
               onMouseLeave={e => { if (activeModule !== 'dashboard') (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
             >
               <LayoutDashboard size={15} />
@@ -534,14 +524,17 @@ export default function EnterpriseLayout({ user, authToken, onLogout, onSwitchMo
             />
             {/* Search results dropdown */}
             {searchResults.length > 0 && (
-              <div className="absolute top-full left-0 right-0 mt-1 rounded-xl shadow-xl border z-50 overflow-hidden" style={{ background: '#fff', borderColor: C.border }}>
+              <div className="absolute top-full left-0 right-0 mt-1 rounded-xl shadow-xl border z-50 overflow-hidden" style={{ background: C.card, borderColor: C.border }}>
                 {searchResults.map(r => {
                   const Icon = r.icon;
                   return (
                     <button
                       key={r.id}
                       onClick={() => { selectModule(r.id); setSearch(''); }}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 text-xs hover:bg-gray-50 transition-colors text-left"
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-xs transition-colors text-left"
+                      style={{ color: C.text }}
+                      onMouseEnter={e => (e.currentTarget.style.background = C.hover)}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                     >
                       <Icon size={13} style={{ color: C.textMuted }} />
                       <span style={{ color: C.text }}>{r.label}</span>
@@ -560,6 +553,18 @@ export default function EnterpriseLayout({ user, authToken, onLogout, onSwitchMo
             <div className="w-1.5 h-1.5 rounded-full bg-green-500" style={{ boxShadow: '0 0 0 2px rgba(34,197,94,0.2)' }} />
             <span className="text-[10px] font-bold" style={{ color: '#15803D' }}>SISTEM ONLINE</span>
           </div>
+
+          {/* Dark / Light toggle */}
+          <button
+            onClick={toggleTheme}
+            title={isDark ? 'Beralih ke Mode Terang' : 'Beralih ke Mode Gelap'}
+            className="w-8 h-8 flex items-center justify-center rounded-lg transition-all flex-shrink-0"
+            style={{ background: C.bg, border: `1px solid ${C.border}`, color: C.textMuted }}
+            onMouseEnter={e => (e.currentTarget.style.background = C.active)}
+            onMouseLeave={e => (e.currentTarget.style.background = C.bg)}
+          >
+            {isDark ? <Sun size={15} style={{ color: '#FBB040' }} /> : <Moon size={15} />}
+          </button>
 
           {/* Time */}
           <div className="hidden xl:block text-right flex-shrink-0">

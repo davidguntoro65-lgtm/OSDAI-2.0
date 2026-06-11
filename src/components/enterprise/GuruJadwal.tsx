@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Calendar, Clock, BookOpen, MapPin, User, RefreshCcw } from 'lucide-react';
 
-const C = { primary: '#FF6A00', bg: '#F5F7FA', card: '#FFFFFF', border: '#E5E7EB', text: '#111827', textMuted: '#6B7280', textSub: '#374151' };
+import { C } from '@/lib/themeC';
 
 const DAYS = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
 const PERIODS = Array.from({ length: 10 }, (_, i) => i + 1);

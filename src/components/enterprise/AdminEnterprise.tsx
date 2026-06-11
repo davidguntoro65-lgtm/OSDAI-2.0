@@ -21,14 +21,14 @@ import {
   KalenderModule,
 } from './SystemMonitorModule';
 
+import { C } from '@/lib/themeC';
+
 interface Props {
   user: any;
   authToken: string;
   onLogout: () => void;
   onSwitchMobile: () => void;
 }
-
-const C = { bg: '#F5F7FA', card: '#FFFFFF', border: '#E5E7EB', text: '#111827', textMuted: '#6B7280', primary: '#FF6A00' };
 
 const PlaceholderModule = ({ title, desc }: { title: string; desc: string }) => (
   <div className="p-6 flex flex-col items-center justify-center min-h-96">

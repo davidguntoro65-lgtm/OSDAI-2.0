@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Layers, Plus, Edit, Trash2, Users, Search, CheckCircle2, Loader2 } from 'lucide-react';
 
-const C = { primary: '#FF6A00', bg: '#F5F7FA', card: '#FFFFFF', border: '#E5E7EB', text: '#111827', textMuted: '#6B7280', textSub: '#374151' };
+import { C } from '@/lib/themeC';
 
 export default function KelasRombelModule({ authToken }: { authToken: string }) {
   const [classes, setClasses] = useState<any[]>([]);

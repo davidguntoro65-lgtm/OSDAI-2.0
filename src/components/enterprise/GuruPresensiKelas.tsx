@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Radio, Users, CheckCircle2, X, Clock, QrCode, RefreshCcw, Zap, AlertTriangle, BrainCircuit, Loader2, ChevronDown, Monitor, Shield } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
-const C = { primary: '#FF6A00', bg: '#F5F7FA', card: '#FFFFFF', border: '#E5E7EB', text: '#111827', textMuted: '#6B7280', textSub: '#374151' };
+import { C } from '@/lib/themeC';
 
 export default function GuruPresensiKelas({ authToken, user }: { authToken: string; user: any }) {
   const [view, setView] = useState<'idle' | 'active'>('idle');

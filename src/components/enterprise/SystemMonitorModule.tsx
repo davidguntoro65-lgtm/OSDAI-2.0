@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 
-const C = { primary: '#FF6A00', bg: '#F5F7FA', card: '#FFFFFF', border: '#E5E7EB', text: '#111827', textMuted: '#6B7280', textSub: '#374151' };
+import { C } from '@/lib/themeC';
 
 const genData = (n = 12) => Array.from({ length: n }, (_, i) => ({
   t: `${(new Date().getHours() - (n - i - 1)).toString().padStart(2, '0')}:00`,

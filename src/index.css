@@ -14,6 +14,31 @@
   --glass-border: rgba(255, 255, 255, 0.28);
   --glass-blur: blur(30px);
   --radius: 1.5rem;
+
+  /* Enterprise dashboard theme — light (default) */
+  --c-bg: #F5F7FA;
+  --c-card: #FFFFFF;
+  --c-sidebar: #FFFFFF;
+  --c-header: #FFFFFF;
+  --c-border: #E5E7EB;
+  --c-text: #111827;
+  --c-textMuted: #6B7280;
+  --c-textSub: #374151;
+  --c-active: #FFF4ED;
+  --c-hover: #F9FAFB;
+}
+
+[data-theme="dark"] {
+  --c-bg: #0F1117;
+  --c-card: #1A1D27;
+  --c-sidebar: #13151F;
+  --c-header: #13151F;
+  --c-border: #252836;
+  --c-text: #E2E8F0;
+  --c-textMuted: #8892B0;
+  --c-textSub: #CBD5E1;
+  --c-active: #2D1B0E;
+  --c-hover: #1E2130;
 }
 
 @layer base {
