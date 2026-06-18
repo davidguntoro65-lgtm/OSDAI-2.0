@@ -15,11 +15,13 @@ dist/
 out/
 build/
 
-# Uploads / user data
-uploads/
+# Uploads / user data — keep dir structure, ignore contents
+uploads/*
+!uploads/.gitkeep
 
-# Logs
-logs/
+# Logs — keep dir structure, ignore contents
+logs/*
+!logs/.gitkeep
 *.log
 npm-debug.log*
 

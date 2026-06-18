@@ -1,139 +1,196 @@
-# OSDAI — cPanel Deployment Guide (Phusion Passenger)
+# OSDAI — Panduan Deployment cPanel (Phusion Passenger)
 
-## Prerequisites
-- cPanel with Node.js Selector (CloudLinux + Phusion Passenger)
-- PostgreSQL database created in cPanel
-- Node.js 18.19+ selected in cPanel Node.js Selector
+## Prasyarat
+- cPanel dengan **Node.js Selector** (CloudLinux + Phusion Passenger)
+- Node.js versi **22.x** tersedia di cPanel Node.js Selector
+- Database PostgreSQL sudah dibuat di cPanel
+- Domain/subdomain `osdai.smkn1wonogiri.sch.id` sudah diarahkan ke folder yang benar
 
 ---
 
-## Step 1 — Upload / Clone the Project
+## Langkah 1 — Upload / Clone Proyek
+
+Via SSH atau cPanel Terminal:
 
 ```bash
-cd /home/<username>/
-git clone <your-repo-url> osdai
+cd ~/public_html
+git clone <repo-url> osdai
+# atau jika sudah ada: cd osdai && git pull
 ```
 
-Or upload via File Manager and extract to `/home/<username>/osdai/`.
+---
+
+## Langkah 2 — Konfigurasi Node.js Selector di cPanel
+
+1. Login cPanel → **Setup Node.js App** (atau "Node.js Selector")
+2. Klik **Create Application**
+3. Isi pengaturan berikut **dengan tepat**:
+
+   | Setting             | Nilai                                              |
+   |---------------------|----------------------------------------------------|
+   | Node.js version     | **22.x** (minimal 22.13 — wajib untuk pdfjs-dist) |
+   | Application mode    | **Production**                                     |
+   | Application root    | `/home/smknwon2/public_html/osdai`                 |
+   | Application URL     | `osdai.smkn1wonogiri.sch.id`                       |
+   | Application startup file | `app.js`                                      |
+
+4. Klik **Create**
+
+> ⚠️ cPanel akan menulis baris `PassengerNodejs` ke `.htaccess` secara otomatis.
+> Jangan mengedit bagian tersebut secara manual.
 
 ---
 
-## Step 2 — Create the `.env` File
+## Langkah 3 — Buat File `.env`
 
-Copy the example and fill in your cPanel PostgreSQL credentials:
+Via cPanel File Manager atau terminal:
 
 ```bash
+cd ~/public_html/osdai
 cp .env.example .env
-nano .env
+nano .env   # atau edit via File Manager
 ```
 
-Minimum required values:
+Isi nilai berikut (wajib):
 
 ```env
+APP_NAME=OSDAI
 APP_ENV=production
-APP_URL=https://yourdomain.com
-APP_PORT=3000
+APP_URL=https://osdai.smkn1wonogiri.sch.id
 
-DATABASE_URL=postgresql://cpanel_db_user:password@localhost:5432/cpanel_db_name
+# Jangan set APP_PORT — Passenger mengatur PORT otomatis
 
-JWT_SECRET=<generate: openssl rand -hex 64>
-JWT_REFRESH_SECRET=<generate: openssl rand -hex 64>
-QR_SECRET=<generate: openssl rand -hex 32>
+DATABASE_URL=postgresql://USER:PASSWORD@127.0.0.1:5432/DBNAME?sslmode=disable
+
+JWT_SECRET=<minimal 64 karakter acak>
+JWT_REFRESH_SECRET=<minimal 64 karakter acak, berbeda dari JWT_SECRET>
+QR_SECRET=<string acak 32 karakter>
+
+GEMINI_API_KEY=<API key dari https://aistudio.google.com/apikey>
 
 EMAIL_PROVIDER=smtp
-SMTP_HOST=mail.yourdomain.com
+SMTP_HOST=mail.smkn1wonogiri.sch.id
 SMTP_PORT=587
-SMTP_USER=noreply@yourdomain.com
-SMTP_PASS=your_email_password
+SMTP_USER=noreply@smkn1wonogiri.sch.id
+SMTP_PASS=<password email>
+
+CORS_ORIGINS=https://osdai.smkn1wonogiri.sch.id
+RATE_LIMIT_WINDOW_MS=60000
+RATE_LIMIT_MAX=200
+STORAGE_PROVIDER=local
+UPLOAD_DIR=uploads
+LOG_LEVEL=info
+LOG_DIR=logs
 ```
 
-> **Note:** `GEMINI_API_KEY` is only needed if running outside Replit.
-> On Replit, the `AI_INTEGRATIONS_GEMINI_*` variables are auto-provisioned.
+Generate secret aman via terminal:
+```bash
+node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+```
 
 ---
 
-## Step 3 — Set Up the App in cPanel Node.js Selector
-
-1. Log into cPanel → **Setup Node.js App**
-2. Click **Create Application**
-3. Set:
-   - **Node.js version**: 20.x (or latest LTS ≥ 18.19)
-   - **Application mode**: Production
-   - **Application root**: `/home/<username>/osdai`
-   - **Application URL**: `yourdomain.com` (or subdomain)
-   - **Application startup file**: `app.js`
-4. Click **Create**
-
----
-
-## Step 4 — Install Dependencies & Build
-
-Open the **cPanel Terminal** or SSH:
+## Langkah 4 — Install & Build (via cPanel Terminal atau SSH)
 
 ```bash
-cd /home/<username>/osdai
+cd ~/public_html/osdai
 
-# One-command setup
+# Satu perintah: install deps, generate Prisma, build frontend, migrate DB
 npm run cpanel:install
 ```
 
-This runs in order:
-1. `npm install` — installs all dependencies
-2. `npm run build` — compiles React frontend to `/dist`
-3. `npx prisma generate` — generates Prisma client
-4. `npx prisma migrate deploy` — applies migrations to PostgreSQL
+Perintah ini menjalankan secara berurutan:
+1. `npm install` — install semua dependensi
+2. `npx prisma generate` — generate Prisma client
+3. `npm run build` — compile React ke `/dist`
+4. `npx prisma migrate deploy` — terapkan migrasi database
+5. `mkdir -p uploads logs` — buat folder yang dibutuhkan server
+
+Jika **first install** dan perlu data awal (opsional):
+```bash
+npm run cpanel:setup
+# sama seperti cpanel:install + seed data demo
+```
 
 ---
 
-## Step 5 — Restart the Application
+## Langkah 5 — Restart Aplikasi
 
-In cPanel → **Setup Node.js App** → click **Restart** next to your app.
+Di cPanel → **Setup Node.js App** → klik **Restart** di sebelah aplikasi OSDAI.
 
-Passenger will now run `node app.js` which:
-- Loads `.env` automatically
-- Starts the Express server in production mode
-- Serves API routes under `/api/*`
-- Serves the compiled React app from `/dist`
-- Falls back all unmatched routes to `/dist/index.html` (SPA routing)
+Passenger akan menjalankan `node app.js` yang:
+- Memuat `.env` dari disk
+- Menset `NODE_ENV=production`
+- Menjalankan Express server
+- Melayani API di `/api/*`
+- Melayani frontend React dari `/dist`
+- Fallback ke `/dist/index.html` untuk SPA routing
 
 ---
 
-## After Code Updates (git pull)
+## Setelah Update Kode (`git pull`)
 
 ```bash
-cd /home/<username>/osdai
+cd ~/public_html/osdai
 git pull
-npm install          # only if package.json changed
-npm run build        # rebuild frontend
-npx prisma migrate deploy   # only if schema changed
+npm install                    # hanya jika package.json berubah
+npm run build                  # rebuild frontend jika ada perubahan src/
+npx prisma migrate deploy      # hanya jika ada migrasi baru
 ```
 
-Then in cPanel: **Restart** the Node.js application.
+Kemudian di cPanel: klik **Restart** aplikasi Node.js.
 
 ---
 
-## File Structure Reference
+## Struktur File Penting
 
 ```
-/ (application root)
-├── app.js              ← Passenger entry point (this is the "key")
-├── server.ts           ← Full Express API server (loaded by app.js)
-├── dist/               ← Compiled React frontend (created by npm run build)
-├── prisma/             ← PostgreSQL schema & migrations
-├── src/                ← React frontend source
-├── package.json        ← main: "app.js", all deps in "dependencies"
-└── .env                ← Environment variables (copy from .env.example)
+public_html/osdai/
+├── app.js              ← Passenger entry point (jangan diedit)
+├── server.ts           ← Express API server (dimuat oleh app.js)
+├── dist/               ← Frontend React hasil build (dibuat oleh npm run build)
+├── prisma/             ← Schema & migrasi database
+├── src/                ← Source React frontend
+├── uploads/            ← File upload siswa/guru (dibuat otomatis)
+├── logs/               ← Log server (dibuat otomatis)
+├── .env                ← Konfigurasi lingkungan (TIDAK di-commit ke git)
+├── .htaccess           ← Konfigurasi Passenger (cPanel menambah baris otomatis)
+└── package.json        ← main: "app.js"
 ```
 
 ---
 
 ## Troubleshooting
 
-| Problem | Solution |
-|---|---|
-| `tsx: not found` | Run `npm install` — tsx is in dependencies |
-| `STARTUP FAILED: Missing env vars` | Check `.env` file is present and filled |
-| `dist/index.html not found` | Run `npm run build` |
-| 502 Bad Gateway | Check cPanel error logs; restart the Node.js app |
-| Prisma engine error | Run `npx prisma generate` again |
-| Port conflict | Set `APP_PORT` in `.env` to match cPanel's assigned port |
+| Problem | Penyebab | Solusi |
+|---------|----------|--------|
+| Situs menampilkan source code `app.js` | Node.js Selector belum dikonfigurasi | Lakukan Langkah 2 |
+| `tsx: not found` | `npm install` belum dijalankan | Jalankan `npm install` |
+| `STARTUP FAILED: Missing env vars` | File `.env` belum ada/belum diisi | Cek Langkah 3 |
+| `dist/index.html not found` | `npm run build` belum dijalankan | Jalankan `npm run build` |
+| `502 Bad Gateway` | App crash saat start | Cek error log di cPanel, pastikan `.env` lengkap |
+| Prisma engine error | Binary platform tidak cocok | Jalankan `npx prisma generate` ulang |
+| Upload file gagal | Folder `uploads/` belum ada | Jalankan `mkdir -p uploads logs` |
+| Database connection refused | `DATABASE_URL` salah | Cek host: gunakan `127.0.0.1`, bukan `localhost` |
+
+### Melihat Error Log
+
+Di cPanel → **Errors** (di bagian Logs), atau via terminal:
+```bash
+tail -f ~/logs/smknwon2.smkn1wonogiri.sch.id.error.log
+```
+
+---
+
+## Verifikasi Instalasi
+
+Setelah restart, kunjungi:
+- `https://osdai.smkn1wonogiri.sch.id` → harus tampil halaman login OSDAI
+- `https://osdai.smkn1wonogiri.sch.id/api/health` → harus return `{"status":"ok"}`
+
+Akun login default (setelah seed):
+- Admin: `admin@smk.id` / `password123`
+- Guru: `guru@smk.id` / `password123`
+- Siswa: `siswa@smk.id` / `password123`
+
+> ⚠️ **Ganti semua password default** segera setelah login pertama!

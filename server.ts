@@ -149,6 +149,11 @@ async function startServer() {
 
   // --- API Routes ---
 
+  // Health check — used to verify Passenger/Node.js is running (not serving static files)
+  app.get('/api/health', (_req, res) => {
+    res.json({ status: 'ok', env: process.env.APP_ENV || process.env.NODE_ENV || 'unknown', version: '2.0.0' });
+  });
+
   // Auth Endpoints
   app.post('/api/auth/login', async (req, res) => {
     try {
@@ -1934,7 +1939,10 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), 'dist');
+    // Use __dirname (derived from import.meta.url at top of file) so the path
+    // is always relative to server.ts itself — never process.cwd(), which is
+    // unreliable under Phusion Passenger on cPanel.
+    const distPath = path.join(__dirname, 'dist');
     app.use(express.static(distPath, { maxAge: '1d' }));
     app.get('*', (_req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));

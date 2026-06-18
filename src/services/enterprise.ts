@@ -1,12 +1,16 @@
 import { prisma } from '../lib/prisma';
 import { GoogleGenAI } from '@google/genai';
 
+// On Replit: AI_INTEGRATIONS_GEMINI_* are auto-provisioned.
+// On cPanel: falls back to GEMINI_API_KEY from .env.
+// Never pass undefined httpOptions fields — omit them when absent.
+const _geminiHttpOptions = process.env.AI_INTEGRATIONS_GEMINI_BASE_URL
+  ? { apiVersion: '' as const, baseUrl: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL }
+  : undefined;
+
 const ai = new GoogleGenAI({
   apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY || process.env.GEMINI_API_KEY || '',
-  httpOptions: {
-    apiVersion: '',
-    baseUrl: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL,
-  },
+  ...((_geminiHttpOptions) ? { httpOptions: _geminiHttpOptions } : {}),
 });
 
 export const StudentService = {

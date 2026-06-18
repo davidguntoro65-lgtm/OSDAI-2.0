@@ -3,12 +3,16 @@ import { GpsService } from './gps';
 import { GoogleGenAI } from "@google/genai";
 import { randomBytes } from 'crypto';
 
+// On Replit: AI_INTEGRATIONS_GEMINI_* are auto-provisioned.
+// On cPanel: falls back to GEMINI_API_KEY from .env.
+// Never pass undefined httpOptions fields — omit them when absent.
+const _genAIHttpOptions = process.env.AI_INTEGRATIONS_GEMINI_BASE_URL
+  ? { apiVersion: '' as const, baseUrl: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL }
+  : undefined;
+
 const genAI = new GoogleGenAI({
   apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY || process.env.GEMINI_API_KEY || '',
-  httpOptions: {
-    apiVersion: '',
-    baseUrl: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL,
-  },
+  ...((_genAIHttpOptions) ? { httpOptions: _genAIHttpOptions } : {}),
 });
 
 export const IntelligenceService = {
