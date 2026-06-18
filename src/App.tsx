@@ -478,33 +478,6 @@ export default function App() {
                 </div>
               </form>
 
-              <div className="flex items-center gap-3 my-5">
-                <div className="flex-1 h-px" style={{ background: lDivider }} />
-                <span className="text-[8px] font-black uppercase tracking-widest" style={{ color: lDividerText }}>Akun Test</span>
-                <div className="flex-1 h-px" style={{ background: lDivider }} />
-              </div>
-
-              <div className="grid grid-cols-3 gap-2 mb-5">
-                {[
-                  { label: 'Admin', email: 'admin@smk.id', pass: 'password123', color: '#FF6A00' },
-                  { label: 'Guru', email: 'guru@smk.id', pass: 'password123', color: '#f59e0b' },
-                  { label: 'Siswa', email: 'siswa@smk.id', pass: 'password123', color: '#22c55e' },
-                ].map(acc => (
-                  <motion.button
-                    key={acc.email} type="button" whileTap={{ scale: 0.94 }}
-                    onClick={() => { setLoginEmail(acc.email); setLoginPassword(acc.pass); }}
-                    className="flex flex-col items-center py-2.5 px-2 rounded-xl transition-all"
-                    style={{ background: lChipBg, border: `1px solid ${lChipBorder}` }}
-                    onMouseEnter={e => (e.currentTarget.style.borderColor = `${acc.color}40`)}
-                    onMouseLeave={e => (e.currentTarget.style.borderColor = lChipBorder)}
-                  >
-                    <div className="w-1.5 h-1.5 rounded-full mb-1.5" style={{ background: acc.color }} />
-                    <p className="text-[10px] font-black" style={{ color: acc.color }}>{acc.label}</p>
-                    <p className="text-[7px] font-bold mt-0.5 truncate w-full text-center" style={{ color: lMuted }}>{acc.email.split('@')[0]}</p>
-                  </motion.button>
-                ))}
-              </div>
-
               <p className="text-center text-[8px] font-black uppercase tracking-widest" style={{ color: lFooter }}>
                 OSDAI · SMK Negeri 1 Wonogiri · 2026
               </p>

@@ -236,8 +236,8 @@ const FadeUp = ({ children, delay = 0, className = '' }: { children: React.React
 
 // ── Stats data ─────────────────────────────────────────────────────────────────
 const STATS = [
-  { value: '5.000+', label: 'Siswa Aktif', icon: GraduationCap },
-  { value: '200+', label: 'Guru Terkoneksi', icon: Users },
+  { value: '1.188+', label: 'Siswa Aktif', icon: GraduationCap },
+  { value: '100+', label: 'Guru Terkoneksi', icon: Users },
   { value: '99.9%', label: 'Uptime Sistem', icon: Shield },
   { value: '15 Menit', label: 'Setup Awal', icon: Clock },
 ];
@@ -278,13 +278,6 @@ const FEATURES = [
     desc: 'Orang tua & siswa mendapat notifikasi absensi, tugas, dan pengumuman secara instan.',
     color: '#F59E0B',
     grad: 'from-amber-500/20 to-amber-500/5',
-  },
-  {
-    icon: TrendingUp,
-    title: 'Manajemen SPP',
-    desc: 'Tagihan otomatis, laporan keuangan, dan integrasi pembayaran digital untuk bendahara sekolah.',
-    color: '#EC4899',
-    grad: 'from-pink-500/20 to-pink-500/5',
   },
 ];
 
@@ -941,7 +934,7 @@ export default function LandingPage({ onLogin, darkMode, onToggleDark }: Landing
                 }}
               >
                 <Zap size={18} />
-                Mulai Gratis Sekarang
+                MULAI SEKARANG
               </motion.button>
             </div>
 
