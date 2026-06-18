@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react';
 import { Role } from '@prisma/client';
 import { useTheme, type Theme } from '@/lib/ThemeContext';
 import { motion, AnimatePresence, useTime, useTransform } from 'motion/react';
-import { BrainCircuit, Lock, Loader2 } from 'lucide-react';
+import { BrainCircuit, Lock, Loader2, Sun, Moon } from 'lucide-react';
 import DemoBanner from '@/components/DemoBanner';
 import ForgotPasswordScreen from '@/components/ForgotPasswordScreen';
+import LandingPage from '@/components/LandingPage';
 import ModeSelector from '@/components/enterprise/ModeSelector';
 import AdminEnterprise from '@/components/enterprise/AdminEnterprise';
 import GuruEnterprise from '@/components/enterprise/GuruEnterprise';
@@ -134,6 +135,19 @@ export default function App() {
     const saved = localStorage.getItem('osdai_app_mode');
     return (saved as AppMode) || 'pending';
   });
+  // Landing page — shown before login when no token
+  const [showLanding, setShowLanding] = useState<boolean>(() => !localStorage.getItem('token'));
+  // Global dark mode (landing + login screens)
+  const [darkMode, setDarkMode] = useState<boolean>(() => {
+    const saved = localStorage.getItem('osdai_dark_mode');
+    return saved !== null ? saved === 'true' : true;
+  });
+  const toggleDark = () => {
+    setDarkMode(prev => {
+      localStorage.setItem('osdai_dark_mode', String(!prev));
+      return !prev;
+    });
+  };
 
   useEffect(() => {
     if (token) checkAuth();
@@ -193,6 +207,7 @@ export default function App() {
     setActiveTab('beranda');
     setAdminSubPage(null);
     setAppMode('pending');
+    setShowLanding(true);
   };
 
   const handleModeSelect = (mode: 'mobile' | 'web') => {
@@ -209,6 +224,18 @@ export default function App() {
     setActiveTab(toMobileTab(tab));
   };
 
+  // ── LANDING PAGE ─────────────────────────────────────────────────────────────
+
+  if (!token && showLanding) {
+    return (
+      <LandingPage
+        onLogin={() => setShowLanding(false)}
+        darkMode={darkMode}
+        onToggleDark={toggleDark}
+      />
+    );
+  }
+
   // ── FORGOT PASSWORD SCREEN ───────────────────────────────────────────────────
 
   if (showForgotPassword) {
@@ -218,9 +245,23 @@ export default function App() {
   // ── LOGIN SCREEN ─────────────────────────────────────────────────────────────
 
   if (!token || (authLoading && !user)) {
+    const lDark = darkMode;
+    const lBg = lDark ? 'linear-gradient(135deg, #0a0604 0%, #130b05 50%, #0a0604 100%)' : 'linear-gradient(135deg, #f0ece6 0%, #f7f3ee 50%, #f0ece6 100%)';
+    const lText = lDark ? '#ffffff' : '#0d0d14';
+    const lMuted = lDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.45)';
+    const lCardBg = lDark ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.95)';
+    const lCardBorder = lDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.1)';
+    const lInputBg = lDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)';
+    const lInputBorder = lDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.15)';
+    const lInputText = lDark ? '#ffffff' : '#0d0d14';
+    const lDivider = lDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.1)';
+    const lDividerText = lDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.3)';
+    const lChipBg = lDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)';
+    const lChipBorder = lDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.1)';
+    const lFooter = lDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.25)';
     return (
-      <div className="min-h-screen flex items-center justify-center p-5 relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #0a0604 0%, #130b05 50%, #0a0604 100%)' }}>
-        <NeuralBackground />
+      <div className="min-h-screen flex items-center justify-center p-5 relative overflow-hidden" style={{ background: lBg }}>
+        {lDark && <NeuralBackground />}
 
         {/* Ambient glows */}
         <div className="absolute inset-0 pointer-events-none">
@@ -229,71 +270,83 @@ export default function App() {
           <div className="absolute bottom-0 right-0 w-48 h-48 rounded-full blur-3xl" style={{ background: 'radial-gradient(circle, rgba(255,106,0,0.05) 0%, transparent 70%)' }} />
         </div>
 
+        {/* Dark/Light toggle + Back to Landing */}
+        <div className="absolute top-4 right-4 flex items-center gap-2 z-20">
+          <motion.button
+            whileTap={{ scale: 0.92 }}
+            onClick={() => setShowLanding(true)}
+            className="px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all"
+            style={{ background: lCardBg, border: `1px solid ${lCardBorder}`, color: lMuted }}
+          >
+            ← Beranda
+          </motion.button>
+          <motion.button
+            whileTap={{ scale: 0.92 }}
+            onClick={toggleDark}
+            className="w-9 h-9 rounded-xl flex items-center justify-center transition-all"
+            style={{ background: lCardBg, border: `1px solid ${lCardBorder}` }}
+          >
+            <AnimatePresence mode="wait">
+              {lDark ? (
+                <motion.div key="sun" initial={{ rotate: -90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: 90, opacity: 0 }} transition={{ duration: 0.2 }}>
+                  <Sun size={14} style={{ color: '#F59E0B' }} />
+                </motion.div>
+              ) : (
+                <motion.div key="moon" initial={{ rotate: 90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: -90, opacity: 0 }} transition={{ duration: 0.2 }}>
+                  <Moon size={14} style={{ color: '#8B5CF6' }} />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.button>
+        </div>
+
         <motion.div
           initial={{ opacity: 0, scale: 0.93, y: 24 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           transition={{ duration: 0.5, ease: 'easeOut' }}
           className="w-full max-w-sm relative z-10"
         >
-          <GlassPanel className="overflow-hidden border-white/10 shadow-2xl" style={{ background: 'rgba(255,255,255,0.04)', backdropFilter: 'blur(24px)', border: '1px solid rgba(255,255,255,0.08)' }}>
-
+          <GlassPanel
+            className="overflow-hidden shadow-2xl"
+            style={{ background: lCardBg, backdropFilter: 'blur(24px)', border: `1px solid ${lCardBorder}` }}
+          >
             {/* ── Futuristic AI Header ── */}
             <div
-              className="relative px-7 pt-6 pb-5 text-white overflow-hidden"
-              style={{ background: 'linear-gradient(160deg, #0d0804 0%, #1a0d06 55%, #0f0a05 100%)' }}
+              className="relative px-7 pt-6 pb-5 overflow-hidden"
+              style={{ background: lDark ? 'linear-gradient(160deg, #0d0804 0%, #1a0d06 55%, #0f0a05 100%)' : 'linear-gradient(160deg, #fff8f2 0%, #ffede0 55%, #fff5ed 100%)' }}
             >
-              {/* Fine grid */}
               <div className="absolute inset-0 opacity-[0.04]" style={{
-                backgroundImage: 'linear-gradient(rgba(255,255,255,1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,1) 1px, transparent 1px)',
+                backgroundImage: `linear-gradient(${lDark ? 'rgba(255,255,255,1)' : 'rgba(0,0,0,1)'} 1px, transparent 1px), linear-gradient(90deg, ${lDark ? 'rgba(255,255,255,1)' : 'rgba(0,0,0,1)'} 1px, transparent 1px)`,
                 backgroundSize: '20px 20px',
               }} />
-              {/* Radial orange glow */}
               <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse 80% 100% at 50% 0%, rgba(255,106,0,0.22) 0%, transparent 70%)' }} />
-              {/* Corner accent lines */}
               <div className="absolute top-0 left-0 w-8 h-8 border-t border-l border-orange-500/40" />
               <div className="absolute top-0 right-0 w-8 h-8 border-t border-r border-orange-500/40" />
               <div className="absolute bottom-0 left-0 w-8 h-8 border-b border-l border-orange-500/20" />
               <div className="absolute bottom-0 right-0 w-8 h-8 border-b border-r border-orange-500/20" />
-              {/* Scan line */}
               <ScanLine />
 
-              {/* Content */}
               <div className="relative z-10 flex items-center gap-3.5">
-                {/* Logo mark */}
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.6 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 0.6, ease: 'easeOut' }}
-                >
+                <motion.div initial={{ opacity: 0, scale: 0.6 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.6, ease: 'easeOut' }}>
                   <OsdaiLogoMark />
                 </motion.div>
-
-                {/* Text block */}
-                <motion.div
-                  initial={{ opacity: 0, x: -12 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.5, delay: 0.15 }}
-                >
+                <motion.div initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.5, delay: 0.15 }}>
                   <div className="flex items-baseline gap-2">
-                    <h1 className="text-2xl font-black tracking-tight text-white leading-none">OSDAI</h1>
+                    <h1 className="text-2xl font-black tracking-tight leading-none" style={{ color: lDark ? '#ffffff' : '#1a0a00' }}>OSDAI</h1>
                     <motion.span
                       animate={{ opacity: [0.4, 1, 0.4] }}
                       transition={{ duration: 1.8, repeat: Infinity }}
                       className="text-[9px] font-black tracking-widest px-1.5 py-0.5 rounded"
                       style={{ background: 'rgba(255,106,0,0.2)', color: '#FF6A00', border: '1px solid rgba(255,106,0,0.35)' }}
-                    >
-                      v2.0
-                    </motion.span>
+                    >v2.0</motion.span>
                   </div>
-                  <p className="text-[7.5px] font-bold uppercase tracking-[0.16em] mt-1 whitespace-nowrap" style={{ color: 'rgba(255,255,255,0.28)' }}>
+                  <p className="text-[7.5px] font-bold uppercase tracking-[0.16em] mt-1 whitespace-nowrap" style={{ color: lDark ? 'rgba(255,255,255,0.28)' : 'rgba(0,0,0,0.4)' }}>
                     Otomatisasi Sekolah Digital · AI
                   </p>
-                  <p className="text-[7px] font-black mt-0.5 whitespace-nowrap" style={{ color: 'rgba(255,106,0,0.45)', letterSpacing: '0.12em' }}>
+                  <p className="text-[7px] font-black mt-0.5 whitespace-nowrap" style={{ color: 'rgba(255,106,0,0.6)', letterSpacing: '0.12em' }}>
                     SMK Negeri 1 Wonogiri
                   </p>
                 </motion.div>
-
-                {/* Live indicator */}
                 <div className="ml-auto flex flex-col items-end gap-1">
                   <div className="flex items-center gap-1.5">
                     <motion.div
@@ -301,26 +354,22 @@ export default function App() {
                       transition={{ duration: 1.4, repeat: Infinity }}
                       className="w-1.5 h-1.5 rounded-full bg-green-400"
                     />
-                    <span className="text-[8px] font-black uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.25)' }}>LIVE</span>
+                    <span className="text-[8px] font-black uppercase tracking-widest" style={{ color: lDark ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.35)' }}>LIVE</span>
                   </div>
                   <motion.div
                     animate={{ opacity: [0.2, 0.7, 0.2] }}
                     transition={{ duration: 3, repeat: Infinity }}
                     className="text-[7px] font-bold tabular-nums"
-                    style={{ color: 'rgba(255,106,0,0.5)', fontFamily: 'monospace' }}
-                  >
-                    SYS.OK
-                  </motion.div>
+                    style={{ color: 'rgba(255,106,0,0.6)', fontFamily: 'monospace' }}
+                  >SYS.OK</motion.div>
                 </div>
               </div>
 
-              {/* Bottom neural nodes row */}
               <div className="relative z-10 flex items-center gap-1.5 mt-4">
                 {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
                   <motion.div
                     key={i}
                     className="flex-1 h-0.5 rounded-full"
-                    style={{ background: 'rgba(255,106,0,0.12)' }}
                     animate={{ background: ['rgba(255,106,0,0.08)', 'rgba(255,106,0,0.45)', 'rgba(255,106,0,0.08)'] }}
                     transition={{ duration: 2.5, repeat: Infinity, delay: i * 0.18, ease: 'easeInOut' }}
                   />
@@ -329,19 +378,15 @@ export default function App() {
                   animate={{ opacity: [0.3, 0.8, 0.3] }}
                   transition={{ duration: 2.5, repeat: Infinity }}
                   className="text-[7px] font-black tabular-nums ml-1"
-                  style={{ color: 'rgba(255,106,0,0.5)', fontFamily: 'monospace', whiteSpace: 'nowrap' }}
-                >
-                  AI READY
-                </motion.span>
+                  style={{ color: 'rgba(255,106,0,0.6)', fontFamily: 'monospace', whiteSpace: 'nowrap' }}
+                >AI READY</motion.span>
               </div>
             </div>
 
             <div className="px-6 py-5">
-
               <form onSubmit={handleLogin} className="space-y-4">
-                {/* Email */}
                 <div>
-                  <label className="text-[9px] uppercase font-black tracking-widest mb-1.5 block" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                  <label className="text-[9px] uppercase font-black tracking-widest mb-1.5 block" style={{ color: lMuted }}>
                     Alamat Surel
                   </label>
                   <input
@@ -351,20 +396,14 @@ export default function App() {
                     placeholder="nama@smk.id"
                     autoComplete="username"
                     required
-                    className="w-full h-12 px-4 rounded-2xl text-sm font-bold text-white placeholder:font-normal outline-none transition-all"
-                    style={{
-                      background: 'rgba(255,255,255,0.06)',
-                      border: '1px solid rgba(255,255,255,0.1)',
-                      caretColor: '#FF6A00',
-                    }}
+                    className="w-full h-12 px-4 rounded-2xl text-sm font-bold placeholder:font-normal outline-none transition-all"
+                    style={{ background: lInputBg, border: `1px solid ${lInputBorder}`, color: lInputText, caretColor: '#FF6A00' }}
                     onFocus={e => (e.currentTarget.style.borderColor = 'rgba(255,106,0,0.5)')}
-                    onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)')}
+                    onBlur={e => (e.currentTarget.style.borderColor = lInputBorder)}
                   />
                 </div>
-
-                {/* Password */}
                 <div>
-                  <label className="text-[9px] uppercase font-black tracking-widest mb-1.5 block" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                  <label className="text-[9px] uppercase font-black tracking-widest mb-1.5 block" style={{ color: lMuted }}>
                     Kata Sandi
                   </label>
                   <input
@@ -374,14 +413,10 @@ export default function App() {
                     placeholder="••••••••"
                     autoComplete="current-password"
                     required
-                    className="w-full h-12 px-4 rounded-2xl text-sm font-bold text-white placeholder:font-normal outline-none transition-all"
-                    style={{
-                      background: 'rgba(255,255,255,0.06)',
-                      border: '1px solid rgba(255,255,255,0.1)',
-                      caretColor: '#FF6A00',
-                    }}
+                    className="w-full h-12 px-4 rounded-2xl text-sm font-bold placeholder:font-normal outline-none transition-all"
+                    style={{ background: lInputBg, border: `1px solid ${lInputBorder}`, color: lInputText, caretColor: '#FF6A00' }}
                     onFocus={e => (e.currentTarget.style.borderColor = 'rgba(255,106,0,0.5)')}
-                    onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)')}
+                    onBlur={e => (e.currentTarget.style.borderColor = lInputBorder)}
                   />
                 </div>
 
@@ -399,7 +434,6 @@ export default function App() {
                   )}
                 </AnimatePresence>
 
-                {/* Login Button */}
                 <motion.button
                   type="submit"
                   disabled={authLoading}
@@ -414,7 +448,6 @@ export default function App() {
                   )}
                 </motion.button>
 
-                {/* Lupa Password */}
                 <div className="text-center">
                   <button
                     type="button"
@@ -427,14 +460,12 @@ export default function App() {
                 </div>
               </form>
 
-              {/* Divider */}
               <div className="flex items-center gap-3 my-5">
-                <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.07)' }} />
-                <span className="text-[8px] font-black uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.2)' }}>Akun Test</span>
-                <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.07)' }} />
+                <div className="flex-1 h-px" style={{ background: lDivider }} />
+                <span className="text-[8px] font-black uppercase tracking-widest" style={{ color: lDividerText }}>Akun Test</span>
+                <div className="flex-1 h-px" style={{ background: lDivider }} />
               </div>
 
-              {/* Test Account Chips */}
               <div className="grid grid-cols-3 gap-2 mb-5">
                 {[
                   { label: 'Admin', email: 'admin@smk.id', pass: 'password123', color: '#FF6A00' },
@@ -447,19 +478,18 @@ export default function App() {
                     whileTap={{ scale: 0.94 }}
                     onClick={() => { setLoginEmail(acc.email); setLoginPassword(acc.pass); }}
                     className="flex flex-col items-center py-2.5 px-2 rounded-xl transition-all"
-                    style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid rgba(255,255,255,0.08)` }}
+                    style={{ background: lChipBg, border: `1px solid ${lChipBorder}` }}
                     onMouseEnter={e => (e.currentTarget.style.borderColor = `${acc.color}40`)}
-                    onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)')}
+                    onMouseLeave={e => (e.currentTarget.style.borderColor = lChipBorder)}
                   >
                     <div className="w-1.5 h-1.5 rounded-full mb-1.5" style={{ background: acc.color }} />
                     <p className="text-[10px] font-black" style={{ color: acc.color }}>{acc.label}</p>
-                    <p className="text-[7px] font-bold mt-0.5 truncate w-full text-center" style={{ color: 'rgba(255,255,255,0.25)' }}>{acc.email.split('@')[0]}</p>
+                    <p className="text-[7px] font-bold mt-0.5 truncate w-full text-center" style={{ color: lMuted }}>{acc.email.split('@')[0]}</p>
                   </motion.button>
                 ))}
               </div>
 
-              {/* Footer */}
-              <p className="text-center text-[8px] font-black uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.12)' }}>
+              <p className="text-center text-[8px] font-black uppercase tracking-widest" style={{ color: lFooter }}>
                 OSDAI · SMK Negeri 1 Wonogiri · 2026
               </p>
             </div>
