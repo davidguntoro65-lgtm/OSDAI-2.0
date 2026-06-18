@@ -8,7 +8,7 @@ import {
   Layers, FolderOpen, Lock, Eye, Wifi, Package, Zap,
   ClipboardList, TrendingUp, MessageSquare, Award, Clock,
   RefreshCcw, ChevronLeft, User, Globe, AlertTriangle,
-  CheckCircle2, Monitor, Sun, Moon
+  CheckCircle2, Monitor, Sun, Moon, MapPin
 } from 'lucide-react';
 import DemoBanner from '@/components/DemoBanner';
 import { useTheme } from '@/lib/ThemeContext';
@@ -22,6 +22,7 @@ export type EnterpriseModule =
   | 'audit-log' | 'login-monitor' | 'otp-monitor' | 'device-monitor' | 'permission'
   | 'backup' | 'restore' | 'arsip-digital' | 'keuangan' | 'surat-digital'
   | 'ai-analytics' | 'lms' | 'inventory'
+  | 'geofence-gps'
   // Guru modules
   | 'jadwal-mengajar' | 'presensi-kelas' | 'penilaian' | 'materi'
   | 'rekap-kehadiran' | 'komunikasi' | 'laporan-guru';
@@ -92,6 +93,13 @@ const ADMIN_SIDEBAR: SidebarGroup[] = [
       { id: 'login-monitor', label: 'Login Monitor', icon: Eye },
       { id: 'otp-monitor', label: 'OTP Monitor', icon: Key },
       { id: 'permission', label: 'Permission Control', icon: Lock },
+    ]
+  },
+  {
+    label: 'Presensi & GPS',
+    icon: MapPin,
+    items: [
+      { id: 'geofence-gps', label: 'Geofence GPS', icon: MapPin },
     ]
   },
   {

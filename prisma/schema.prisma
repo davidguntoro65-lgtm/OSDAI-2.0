@@ -794,3 +794,36 @@ model Notification {
   sender      User?    @relation("SentNotifications", fields: [senderId], references: [id])
   receiver    User     @relation("ReceivedNotifications", fields: [receiverId], references: [id])
 }
+
+model SchoolGeofence {
+  id           String   @id @default(uuid())
+  name         String   @default("SMKN 1 Wonogiri")
+  latitude     Float    @default(-7.8123)
+  longitude    Float    @default(110.9234)
+  radiusMeters Int      @default(200)
+  isActive     Boolean  @default(true)
+  description  String?
+  createdBy    String?
+  updatedBy    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  changeLogs   GeofenceChangeLog[]
+}
+
+model GeofenceChangeLog {
+  id            String         @id @default(uuid())
+  geofenceId    String
+  geofence      SchoolGeofence @relation(fields: [geofenceId], references: [id])
+  changedBy     String
+  changedByName String?
+  prevLatitude  Float?
+  prevLongitude Float?
+  prevRadius    Int?
+  newLatitude   Float
+  newLongitude  Float
+  newRadius     Int
+  newName       String?
+  reason        String?
+  createdAt     DateTime       @default(now())
+}

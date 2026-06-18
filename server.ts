@@ -1070,11 +1070,143 @@ async function startServer() {
     try {
       const student = await prisma.student.findUnique({ where: { userId: req.user!.userId } });
       if (!student) return res.status(404).json({ error: 'Student profile not found' });
-      
-      const validation = GpsService.validateGeofence(req.body.lat, req.body.lng);
+
+      const validation = await GpsService.validateGeofenceAsync(req.body.lat, req.body.lng);
       const log = await GpsService.logLocation(student.id, req.body);
-      
+
       res.json({ log, validation });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ── GPS Geofence Config ──────────────────────────────────────────────────────
+
+  app.get('/api/gps/geofence', authenticate, async (_req, res) => {
+    try {
+      const config = await GpsService.getGeofenceDetail();
+      res.json(config);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/gps/geofence', authenticate, authorize([Role.SUPER_ADMIN, Role.TU]), async (req: AuthRequest, res) => {
+    try {
+      const { name, latitude, longitude, radiusMeters, description, reason } = req.body;
+      if (!latitude || !longitude || !radiusMeters) {
+        return res.status(400).json({ error: 'latitude, longitude, dan radiusMeters wajib diisi' });
+      }
+      const lat = parseFloat(latitude);
+      const lng = parseFloat(longitude);
+      const radius = parseInt(radiusMeters, 10);
+      if (isNaN(lat) || isNaN(lng) || isNaN(radius)) {
+        return res.status(400).json({ error: 'Nilai koordinat tidak valid' });
+      }
+      if (lat < -90 || lat > 90) return res.status(400).json({ error: 'Latitude harus antara -90 dan 90' });
+      if (lng < -180 || lng > 180) return res.status(400).json({ error: 'Longitude harus antara -180 dan 180' });
+      if (radius < 10 || radius > 10000) return res.status(400).json({ error: 'Radius harus antara 10 dan 10000 meter' });
+
+      const user = await prisma.user.findUnique({ where: { id: req.user!.userId }, select: { name: true } });
+      const result = await GpsService.saveGeofence({
+        name: name || 'SMKN 1 Wonogiri',
+        latitude: lat,
+        longitude: lng,
+        radiusMeters: radius,
+        description,
+        reason,
+        changedBy: req.user!.userId,
+        changedByName: user?.name,
+      });
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get('/api/gps/geofence/history', authenticate, authorize([Role.SUPER_ADMIN, Role.TU, Role.KEPALA_SEKOLAH]), async (req, res) => {
+    try {
+      const limit = parseInt(String(req.query.limit || '100'), 10);
+      const history = await GpsService.getChangeHistory(limit);
+      res.json(history);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ── GPS Integrity Reports ────────────────────────────────────────────────────
+
+  app.get('/api/gps/reports', authenticate, authorize([Role.SUPER_ADMIN, Role.TU, Role.KEPALA_SEKOLAH, Role.BK, Role.SATPAM]), async (req, res) => {
+    try {
+      const { dateFrom, dateTo, studentId, classId, isMock, page, limit } = req.query;
+      const result = await GpsService.getIntegrityLogs({
+        dateFrom: dateFrom as string,
+        dateTo: dateTo as string,
+        studentId: studentId as string,
+        classId: classId as string,
+        isMock: isMock !== undefined ? isMock === 'true' : undefined,
+        page: page ? parseInt(String(page), 10) : 1,
+        limit: limit ? parseInt(String(limit), 10) : 50,
+      });
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get('/api/gps/reports/summary', authenticate, authorize([Role.SUPER_ADMIN, Role.TU, Role.KEPALA_SEKOLAH, Role.BK]), async (req, res) => {
+    try {
+      const { dateFrom, dateTo } = req.query;
+      const summary = await GpsService.getIntegritySummary(dateFrom as string, dateTo as string);
+      res.json(summary);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get('/api/gps/reports/export', authenticate, authorize([Role.SUPER_ADMIN, Role.TU, Role.KEPALA_SEKOLAH]), async (req, res) => {
+    try {
+      const { dateFrom, dateTo, studentId, classId, isMock } = req.query;
+      const result = await GpsService.getIntegrityLogs({
+        dateFrom: dateFrom as string,
+        dateTo: dateTo as string,
+        studentId: studentId as string,
+        classId: classId as string,
+        isMock: isMock !== undefined ? isMock === 'true' : undefined,
+        page: 1,
+        limit: 5000,
+      });
+
+      const geofence = await GpsService.getActiveGeofence();
+      const headers = ['No', 'Nama Siswa', 'Kelas', 'Timestamp', 'Latitude', 'Longitude', 'Akurasi (m)', 'Jarak ke Sekolah (m)', 'Di Dalam Radius', 'Mock GPS', 'Info Perangkat'];
+      const rows = result.logs.map((l: any, i: number) => [
+        i + 1,
+        l.student?.user?.name || l.studentId,
+        l.student?.class?.name || '-',
+        new Date(l.timestamp).toLocaleString('id-ID'),
+        l.lat,
+        l.lng,
+        l.accuracy,
+        l.distance,
+        l.isInside ? 'YA' : 'TIDAK',
+        l.isMock ? 'YA' : 'TIDAK',
+        l.deviceInfo || '-',
+      ]);
+
+      const csv = [
+        `# LAPORAN INTEGRITAS GPS - OSDAI v2.0`,
+        `# SMK Negeri 1 Wonogiri`,
+        `# Dicetak: ${new Date().toLocaleString('id-ID')}`,
+        `# Geofence Aktif: ${geofence.name} | Radius: ${geofence.radius}m`,
+        `# Total Data: ${result.total}`,
+        '',
+        headers.join(','),
+        ...rows.map(r => r.map(v => `"${v}"`).join(',')),
+      ].join('\n');
+
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="laporan-gps-${Date.now()}.csv"`);
+      res.send('\uFEFF' + csv); // BOM for Excel UTF-8
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
