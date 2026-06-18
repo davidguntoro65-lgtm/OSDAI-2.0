@@ -22,7 +22,8 @@
     "deploy": "node --import tsx/esm scripts/deploy.mjs",
     "backup": "node --import tsx/esm scripts/backup.mjs",
     "validate:env": "node --import tsx/esm scripts/validateEnv.mjs",
-    "cpanel:install": "npm install && npm run build && npx prisma generate && npx prisma migrate deploy"
+    "cpanel:install": "npm install && npx prisma generate && npx prisma migrate deploy && npm run build",
+    "cpanel:setup": "npm install && npx prisma generate && npx prisma migrate deploy && npm run build && node --import tsx/esm prisma/seed.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",

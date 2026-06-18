@@ -46,7 +46,7 @@ ensureDir('uploads');
 ensureDir('logs');
 ensureDir('backups');
 
-run('npm ci --omit=dev', 'Install production dependencies');
+run('npm install', 'Install dependencies');
 run('node_modules/.bin/prisma generate', 'Prisma — generate client');
 run('node_modules/.bin/prisma migrate deploy', 'Prisma — run migrations');
 run('node_modules/.bin/vite build', 'Frontend — build');

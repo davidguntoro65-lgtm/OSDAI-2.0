@@ -78,7 +78,7 @@ export default function IntelligenceDashboard({ authToken }: { authToken: string
     };
     init();
 
-    const sock = io();
+    const sock = io({ transports: ['polling', 'websocket'] });
     setSocket(sock);
     return () => { sock.close(); };
   }, [authToken]);

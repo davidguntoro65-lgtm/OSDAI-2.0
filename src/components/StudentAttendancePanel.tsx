@@ -81,7 +81,7 @@ export default function StudentAttendancePanel({ authToken }: { authToken: strin
     fetchHistory();
 
     // Listen for new session signals via socket
-    const socket = io();
+    const socket = io({ transports: ['polling', 'websocket'] });
     socket.on('session-opened', () => fetchActiveSession());
     socket.on('session-closed', () => {
       setActiveSession(null);

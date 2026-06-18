@@ -57,6 +57,11 @@ async function startServer() {
       methods: ['GET', 'POST'],
       credentials: true,
     },
+    // cPanel/Passenger shared hosting: start with polling, upgrade to websocket if available
+    transports: ['polling', 'websocket'],
+    allowEIO3: true,
+    pingTimeout: 60000,
+    pingInterval: 25000,
   });
 
   // ── Security ──────────────────────────────────────────────
@@ -1788,7 +1793,9 @@ async function startServer() {
 
   // --- Vite Integration ---
 
-  if (process.env.NODE_ENV !== 'production') {
+  const isProd = (process.env.NODE_ENV || process.env.APP_ENV || '').toLowerCase() === 'production';
+
+  if (!isProd) {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
@@ -1796,8 +1803,8 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
+    app.use(express.static(distPath, { maxAge: '1d' }));
+    app.get('*', (_req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }

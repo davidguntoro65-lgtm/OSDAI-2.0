@@ -71,7 +71,7 @@ export default function PusatMonitoringKepsek({ authToken }: { authToken: string
   useEffect(() => {
     fetchData();
     const interval = setInterval(fetchData, 15000);
-    const sock = io();
+    const sock = io({ transports: ['polling', 'websocket'] });
     setSocket(sock);
     sock.on('attendance-update', () => fetchData());
     sock.on('session-activated', () => fetchData());

@@ -17,7 +17,7 @@ function getMidtransSnap() {
             return null;
         }
         snap = new midtransClient.Snap({
-            isProduction: false,
+            isProduction: process.env.MIDTRANS_IS_PRODUCTION === 'true',
             serverKey: serverKey,
             clientKey: clientKey
         });

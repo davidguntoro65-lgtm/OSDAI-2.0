@@ -166,7 +166,7 @@ export default function MobileGuruPresensi({ authToken, user }: { authToken: str
     init();
     ambilJadwalHariIni();
 
-    const sock = io();
+    const sock = io({ transports: ['polling', 'websocket'] });
     setSocket(sock);
     return () => { sock.close(); };
   }, [authToken]);

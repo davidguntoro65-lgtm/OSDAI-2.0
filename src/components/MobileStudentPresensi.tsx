@@ -120,7 +120,7 @@ export default function MobileStudentPresensi({
   useEffect(() => {
     fetchActiveSession();
     fetchHistory();
-    const socket = io();
+    const socket = io({ transports: ['polling', 'websocket'] });
     socket.on('session-opened', () => fetchActiveSession());
     socket.on('session-closed', () => {
       setActiveSession(null);
