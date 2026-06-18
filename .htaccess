@@ -1,21 +1,79 @@
+# ================================================================
 # OSDAI — Phusion Passenger / cPanel Entry Point
+# ================================================================
 #
-# IMPORTANT: Do NOT add a RewriteRule pointing to app.js here.
-# That causes Apache to serve app.js as a text file when Passenger is inactive.
+# LANGKAH WAJIB di cPanel sebelum app bisa berjalan penuh:
+#   1. Login cPanel → "Setup Node.js App"
+#   2. Create Application:
+#        Node.js version    : 22.x  (minimum 22.13)
+#        Application mode   : Production
+#        Application root   : /home/smknwon2/public_html/osdai
+#        Application URL    : osdai.smkn1wonogiri.sch.id
+#        Startup file       : app.js
+#   3. Klik Create → cPanel menulis PassengerNodejs otomatis
+#   4. Jalankan di terminal: npm run cpanel:install
+#   5. Klik Restart di Node.js Selector
 #
-# Passenger intercepts all requests automatically once configured in
-# cPanel → Node.js Selector. The PassengerNodejs path is written there
-# by cPanel and should NOT be hardcoded here.
-#
-# Required cPanel Node.js Selector settings:
-#   Node.js version : 22.x (>=22.13 required for pdfjs-dist)
-#   Application mode: Production
-#   Application root: /home/<user>/public_html/osdai   (or wherever git was cloned)
-#   Application URL : osdai.smkn1wonogiri.sch.id
-#   Startup file    : app.js
+# Sampai Node.js Selector dikonfigurasi, .htaccess ini otomatis
+# melayani frontend React dari dist/ (tampilan login muncul).
+# API tidak berfungsi sampai Passenger aktif.
+# ================================================================
 
+# --- Phusion Passenger (diaktifkan oleh cPanel Node.js Selector) ---
+# cPanel akan menambahkan PassengerNodejs & PassengerAppRoot secara
+# otomatis antara marker "CLOUDLINUX PASSENGER CONFIGURATION".
 PassengerEnabled on
 PassengerStartupFile app.js
 PassengerAppType node
 PassengerMaxPoolSize 1
 PassengerFriendlyErrorPages off
+
+Options -Indexes -MultiViews
+
+RewriteEngine On
+
+# ----------------------------------------------------------------
+# 1. Blokir akses langsung ke file server-side (KEAMANAN KRITIS)
+#    Tanpa ini, Apache akan serve app.js sebagai teks biasa.
+# ----------------------------------------------------------------
+RewriteRule ^app\.js$      - [F,L]
+RewriteRule ^server\.ts$   - [F,L]
+RewriteRule ^\.env$        - [F,L]
+RewriteRule ^\.env\..*$    - [F,L]
+RewriteRule ^package\.json$ - [F,L]
+RewriteRule ^tsconfig.*$   - [F,L]
+RewriteRule ^prisma/       - [F,L]
+RewriteRule ^src/          - [F,L]
+RewriteRule ^scripts/      - [F,L]
+
+# ----------------------------------------------------------------
+# 2. File yang benar-benar ada — layani langsung (aset dist/ dll)
+# ----------------------------------------------------------------
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteRule ^ - [L]
+
+# ----------------------------------------------------------------
+# 3. API & Socket.IO — stop rewriting, serahkan ke Passenger
+#    Jika Passenger belum aktif, akan 404 (lebih baik dari HTML)
+# ----------------------------------------------------------------
+RewriteRule ^api/      - [L]
+RewriteRule ^socket\.io - [L]
+
+# ----------------------------------------------------------------
+# 4. Fallback statis: layani dist/ selagi Passenger belum aktif
+#    Begitu Passenger aktif, rules ini tidak pernah tercapai.
+#    Pastikan npm run build sudah dijalankan terlebih dahulu.
+# ----------------------------------------------------------------
+
+# 4a. File ada di dist/ → layani dari sana (JS, CSS, gambar, font)
+RewriteCond %{DOCUMENT_ROOT}/dist%{REQUEST_URI} -f
+RewriteRule ^(.+)$ /dist/$1 [L,QSA]
+
+# 4b. SPA catch-all → dist/index.html (React Router menangani sub-path)
+RewriteCond %{DOCUMENT_ROOT}/dist/index.html -f
+RewriteRule ^ /dist/index.html [L]
+
+# ----------------------------------------------------------------
+# 5. Fallback absolut jika dist/ belum dibuild → 503
+# ----------------------------------------------------------------
+ErrorDocument 503 "<h2>OSDAI sedang dipersiapkan. Jalankan: npm run cpanel:install</h2>"
