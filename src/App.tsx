@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Role } from '@prisma/client';
 import { useTheme, type Theme } from '@/lib/ThemeContext';
 import { motion, AnimatePresence, useTime, useTransform } from 'motion/react';
@@ -10,9 +10,6 @@ import ModeSelector from '@/components/enterprise/ModeSelector';
 import AdminEnterprise from '@/components/enterprise/AdminEnterprise';
 import GuruEnterprise from '@/components/enterprise/GuruEnterprise';
 
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { CardContent } from '@/components/ui/card';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import NeuralBackground from '@/components/NeuralBackground';
 
@@ -31,15 +28,11 @@ import MobileGuruPresensi from '@/components/MobileGuruPresensi';
 import PusatMonitoringKepsek from '@/components/PusatMonitoringKepsek';
 import StudentModule from '@/components/StudentModule';
 import TeacherModule from '@/components/TeacherModule';
-import FinanceModule from '@/components/FinanceModule';
-import ArchiveModule from '@/components/ArchiveModule';
-import SuratModule from '@/components/SuratModule';
 import AIAnalyticsModule from '@/components/AIAnalyticsModule';
 import LMSModule from '@/components/LMSModule';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-// Futuristic AI logo mark — orbiting rings + neural core
 const OsdaiLogoMark = () => {
   const time = useTime();
   const rotate1 = useTransform(time, t => (t / 3000) * 360);
@@ -47,14 +40,12 @@ const OsdaiLogoMark = () => {
   const rotate3 = useTransform(time, t => (t / 7000) * 360);
   return (
     <div className="relative w-12 h-12 flex items-center justify-center">
-      {/* Outer orbit ring */}
       <motion.div style={{ rotate: rotate1 }} className="absolute inset-0">
         <svg viewBox="0 0 48 48" className="w-full h-full">
           <circle cx="24" cy="24" r="22" fill="none" stroke="rgba(255,106,0,0.25)" strokeWidth="0.8" strokeDasharray="4 3" />
           <circle cx="24" cy="2" r="2.5" fill="#FF6A00" />
         </svg>
       </motion.div>
-      {/* Mid orbit ring */}
       <motion.div style={{ rotate: rotate2 }} className="absolute inset-[5px]">
         <svg viewBox="0 0 38 38" className="w-full h-full">
           <circle cx="19" cy="19" r="17" fill="none" stroke="rgba(255,106,0,0.18)" strokeWidth="0.7" strokeDasharray="2 4" />
@@ -62,7 +53,6 @@ const OsdaiLogoMark = () => {
           <circle cx="19" cy="36" r="1.8" fill="rgba(255,180,60,0.9)" />
         </svg>
       </motion.div>
-      {/* Inner slow ring */}
       <motion.div style={{ rotate: rotate3 }} className="absolute inset-[10px]">
         <svg viewBox="0 0 28 28" className="w-full h-full">
           <circle cx="14" cy="14" r="12" fill="none" stroke="rgba(255,106,0,0.12)" strokeWidth="0.6" />
@@ -71,7 +61,6 @@ const OsdaiLogoMark = () => {
           <circle cx="14" cy="26" r="1.5" fill="rgba(255,106,0,0.6)" />
         </svg>
       </motion.div>
-      {/* Core icon */}
       <motion.div
         animate={{ boxShadow: ['0 0 0px rgba(255,106,0,0.6)', '0 0 14px rgba(255,106,0,1)', '0 0 0px rgba(255,106,0,0.6)'] }}
         transition={{ duration: 2.2, repeat: Infinity }}
@@ -84,7 +73,6 @@ const OsdaiLogoMark = () => {
   );
 };
 
-// Scanning line that sweeps across the header
 const ScanLine = () => (
   <motion.div
     className="absolute left-0 right-0 h-px pointer-events-none"
@@ -94,24 +82,27 @@ const ScanLine = () => (
   />
 );
 
-const defaultTab = (role: string): MobileTab => {
-  if (role === 'GURU') return 'beranda';
-  if (role === 'SISWA') return 'beranda';
-  if (role === 'KEPALA_SEKOLAH') return 'beranda';
-  return 'beranda';
-};
-
-// Roles that map to the admin-style dashboard
+const defaultTab = (role: string): MobileTab => 'beranda';
 const ADMIN_ROLES = ['SUPER_ADMIN', 'TU', 'BK', 'BENDAHARA'];
 
-// Map internal tab IDs to MobileTab for navigate-from-dashboard calls
 function toMobileTab(tab: string): MobileTab {
-  if (tab === 'laporan' || tab === 'analitik' || tab === 'keuangan' || tab === 'arsip' || tab === 'surat' || tab === 'lms') return 'laporan';
+  if (['laporan', 'analitik', 'keuangan', 'arsip', 'surat', 'lms'].includes(tab)) return 'laporan';
   if (tab === 'jadwal') return 'jadwal';
   if (tab === 'presensi') return 'presensi';
-  if (tab === 'monitoring') return 'beranda'; // kepsek monitoring lives in beranda
-  if (tab === 'siswa' || tab === 'guru') return 'beranda';
   return 'beranda';
+}
+
+// ── Page-level transition config ───────────────────────────────────────────────
+
+// Each page slides in from a direction (forward = right-to-left, back = left-to-right)
+// direction: +1 = forward (slide from right), -1 = backward (slide from left)
+const PAGE_ORDER = ['landing', 'login', 'forgot', 'mode-select', 'web-app', 'mobile-app'];
+
+function pageDirection(from: string, to: string): number {
+  const fi = PAGE_ORDER.indexOf(from);
+  const ti = PAGE_ORDER.indexOf(to);
+  if (fi === -1 || ti === -1) return 1;
+  return ti >= fi ? 1 : -1;
 }
 
 // ── App ────────────────────────────────────────────────────────────────────────
@@ -128,20 +119,21 @@ export default function App() {
   const [loginPassword, setLoginPassword] = useState('');
   const [loginError, setLoginError] = useState('');
   const [showForgotPassword, setShowForgotPassword] = useState(false);
-  // For admin beranda sub-navigation (siswa/guru modules)
   const [adminSubPage, setAdminSubPage] = useState<string | null>(null);
-  // App mode: 'pending' = show selector, 'mobile' = mobile UI, 'web' = enterprise web UI
   const [appMode, setAppMode] = useState<AppMode>(() => {
     const saved = localStorage.getItem('osdai_app_mode');
     return (saved as AppMode) || 'pending';
   });
-  // Landing page — shown before login when no token
   const [showLanding, setShowLanding] = useState<boolean>(() => !localStorage.getItem('token'));
-  // Global dark mode (landing + login screens)
   const [darkMode, setDarkMode] = useState<boolean>(() => {
     const saved = localStorage.getItem('osdai_dark_mode');
     return saved !== null ? saved === 'true' : true;
   });
+
+  // Track previous page key for slide direction
+  const prevPageRef = useRef('landing');
+  const dirRef = useRef(1);
+
   const toggleDark = () => {
     setDarkMode(prev => {
       localStorage.setItem('osdai_dark_mode', String(!prev));
@@ -216,7 +208,6 @@ export default function App() {
   };
 
   const navigate = (tab: string) => {
-    // Handle special admin sub-pages
     if (tab === 'siswa') { setAdminSubPage('siswa'); setActiveTab('beranda'); return; }
     if (tab === 'guru') { setAdminSubPage('guru'); setActiveTab('beranda'); return; }
     if (tab === 'monitoring') { setAdminSubPage('monitoring'); setActiveTab('beranda'); return; }
@@ -224,53 +215,117 @@ export default function App() {
     setActiveTab(toMobileTab(tab));
   };
 
-  // ── LANDING PAGE ─────────────────────────────────────────────────────────────
+  // ── Login screen theme tokens (computed unconditionally) ───────────────────
+  const lDark = darkMode;
+  const lBg = lDark
+    ? 'linear-gradient(135deg, #0a0604 0%, #130b05 50%, #0a0604 100%)'
+    : 'linear-gradient(135deg, #f0ece6 0%, #f7f3ee 50%, #f0ece6 100%)';
+  const lMuted = lDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.45)';
+  const lCardBg = lDark ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.95)';
+  const lCardBorder = lDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.1)';
+  const lInputBg = lDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)';
+  const lInputBorder = lDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.15)';
+  const lInputText = lDark ? '#ffffff' : '#0d0d14';
+  const lDivider = lDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.1)';
+  const lDividerText = lDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.3)';
+  const lChipBg = lDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)';
+  const lChipBorder = lDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.1)';
+  const lFooter = lDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.25)';
 
+  // ── Determine current page key ─────────────────────────────────────────────
+  let pageKey: string;
   if (!token && showLanding) {
-    return (
+    pageKey = 'landing';
+  } else if (showForgotPassword) {
+    pageKey = 'forgot';
+  } else if (!token || (authLoading && !user)) {
+    pageKey = 'login';
+  } else if (token && user && appMode === 'pending') {
+    pageKey = 'mode-select';
+  } else if (token && user && appMode === 'web') {
+    pageKey = 'web-app';
+  } else {
+    pageKey = 'mobile-app';
+  }
+
+  // Compute slide direction
+  if (pageKey !== prevPageRef.current) {
+    dirRef.current = pageDirection(prevPageRef.current, pageKey);
+    prevPageRef.current = pageKey;
+  }
+  const dir = dirRef.current;
+
+  // ── Mobile app role helpers ────────────────────────────────────────────────
+  const role = user?.role || 'GURU';
+  const isGuru = role === 'GURU';
+  const isSiswa = role === 'SISWA';
+  const isKepsek = role === 'KEPALA_SEKOLAH';
+  const isAdmin = ADMIN_ROLES.includes(role);
+
+  const renderBeranda = () => {
+    if (adminSubPage === 'siswa') return <div className="flex-1 overflow-y-auto pb-24 px-3 pt-2"><StudentModule authToken={token!} /></div>;
+    if (adminSubPage === 'guru') return <div className="flex-1 overflow-y-auto pb-24 px-3 pt-2"><TeacherModule authToken={token!} /></div>;
+    if (adminSubPage === 'monitoring') return <div className="flex-1 overflow-y-auto pb-24 px-3 pt-2"><PusatMonitoringKepsek authToken={token!} /></div>;
+    if (isGuru) return <GuruDashboard authToken={token!} user={user} onNavigate={navigate} />;
+    if (isSiswa) return <SiswaDashboard authToken={token!} user={user} onNavigate={navigate} />;
+    if (isKepsek) return <KepsekDashboard authToken={token!} user={user} onNavigate={navigate} />;
+    return <AdminDashboard authToken={token!} user={user} role={role} onNavigate={navigate} />;
+  };
+
+  const renderPresensi = () => {
+    if (isSiswa) return <MobileStudentPresensi authToken={token!} user={user} />;
+    if (isKepsek) return <div className="flex-1 overflow-y-auto pb-24 px-3 pt-2"><PusatMonitoringKepsek authToken={token!} /></div>;
+    return <MobileGuruPresensi authToken={token!} user={user} />;
+  };
+
+  const pageTitle = (() => {
+    if (adminSubPage === 'siswa') return 'Manajemen Siswa';
+    if (adminSubPage === 'guru') return 'Manajemen Guru';
+    if (adminSubPage === 'monitoring') return 'Ruang Kendali';
+    if (activeTab === 'beranda') {
+      if (isKepsek) return 'Ruang Kepala';
+      if (isGuru) return 'Beranda Guru';
+      if (isSiswa) return 'Beranda Siswa';
+      return 'Beranda';
+    }
+    if (activeTab === 'presensi') return 'Presensi';
+    if (activeTab === 'jadwal') return 'Jadwal';
+    if (activeTab === 'laporan') return 'Laporan';
+    if (activeTab === 'akun') return 'Akun Saya';
+    return 'OSDAI';
+  })();
+
+  // ── Web app role helpers ──────────────────────────────────────────────────
+  const ADMIN_ROLES_WEB = ['SUPER_ADMIN', 'TU', 'BK', 'BENDAHARA', 'KEPALA_SEKOLAH'];
+  const isAdminRole = ADMIN_ROLES_WEB.includes(role);
+
+  // ── Page content ──────────────────────────────────────────────────────────
+  let pageContent: React.ReactNode;
+
+  if (pageKey === 'landing') {
+    pageContent = (
       <LandingPage
         onLogin={() => setShowLanding(false)}
         darkMode={darkMode}
         onToggleDark={toggleDark}
       />
     );
-  }
-
-  // ── FORGOT PASSWORD SCREEN ───────────────────────────────────────────────────
-
-  if (showForgotPassword) {
-    return <ForgotPasswordScreen onBack={() => setShowForgotPassword(false)} />;
-  }
-
-  // ── LOGIN SCREEN ─────────────────────────────────────────────────────────────
-
-  if (!token || (authLoading && !user)) {
-    const lDark = darkMode;
-    const lBg = lDark ? 'linear-gradient(135deg, #0a0604 0%, #130b05 50%, #0a0604 100%)' : 'linear-gradient(135deg, #f0ece6 0%, #f7f3ee 50%, #f0ece6 100%)';
-    const lText = lDark ? '#ffffff' : '#0d0d14';
-    const lMuted = lDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.45)';
-    const lCardBg = lDark ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.95)';
-    const lCardBorder = lDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.1)';
-    const lInputBg = lDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)';
-    const lInputBorder = lDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.15)';
-    const lInputText = lDark ? '#ffffff' : '#0d0d14';
-    const lDivider = lDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.1)';
-    const lDividerText = lDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.3)';
-    const lChipBg = lDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)';
-    const lChipBorder = lDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.1)';
-    const lFooter = lDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.25)';
-    return (
+  } else if (pageKey === 'forgot') {
+    pageContent = (
+      <ForgotPasswordScreen onBack={() => setShowForgotPassword(false)} />
+    );
+  } else if (pageKey === 'login') {
+    pageContent = (
       <div className="min-h-screen flex items-center justify-center p-5 relative overflow-hidden" style={{ background: lBg }}>
         {lDark && <NeuralBackground />}
 
-        {/* Ambient glows */}
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-64 rounded-full blur-3xl" style={{ background: 'radial-gradient(circle, rgba(255,106,0,0.1) 0%, transparent 70%)' }} />
           <div className="absolute bottom-0 left-0 w-64 h-64 rounded-full blur-3xl" style={{ background: 'radial-gradient(circle, rgba(124,58,237,0.05) 0%, transparent 70%)' }} />
           <div className="absolute bottom-0 right-0 w-48 h-48 rounded-full blur-3xl" style={{ background: 'radial-gradient(circle, rgba(255,106,0,0.05) 0%, transparent 70%)' }} />
         </div>
 
-        {/* Dark/Light toggle + Back to Landing */}
+        {/* Top-right controls */}
         <div className="absolute top-4 right-4 flex items-center gap-2 z-20">
           <motion.button
             whileTap={{ scale: 0.92 }}
@@ -303,14 +358,14 @@ export default function App() {
         <motion.div
           initial={{ opacity: 0, scale: 0.93, y: 24 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          transition={{ duration: 0.5, ease: 'easeOut' }}
+          transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
           className="w-full max-w-sm relative z-10"
         >
           <GlassPanel
             className="overflow-hidden shadow-2xl"
             style={{ background: lCardBg, backdropFilter: 'blur(24px)', border: `1px solid ${lCardBorder}` }}
           >
-            {/* ── Futuristic AI Header ── */}
+            {/* Header */}
             <div
               className="relative px-7 pt-6 pb-5 overflow-hidden"
               style={{ background: lDark ? 'linear-gradient(160deg, #0d0804 0%, #1a0d06 55%, #0f0a05 100%)' : 'linear-gradient(160deg, #fff8f2 0%, #ffede0 55%, #fff5ed 100%)' }}
@@ -327,7 +382,7 @@ export default function App() {
               <ScanLine />
 
               <div className="relative z-10 flex items-center gap-3.5">
-                <motion.div initial={{ opacity: 0, scale: 0.6 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.6, ease: 'easeOut' }}>
+                <motion.div initial={{ opacity: 0, scale: 0.6 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.6 }}>
                   <OsdaiLogoMark />
                 </motion.div>
                 <motion.div initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.5, delay: 0.15 }}>
@@ -349,11 +404,7 @@ export default function App() {
                 </motion.div>
                 <div className="ml-auto flex flex-col items-end gap-1">
                   <div className="flex items-center gap-1.5">
-                    <motion.div
-                      animate={{ scale: [1, 1.6, 1], opacity: [1, 0.3, 1] }}
-                      transition={{ duration: 1.4, repeat: Infinity }}
-                      className="w-1.5 h-1.5 rounded-full bg-green-400"
-                    />
+                    <motion.div animate={{ scale: [1, 1.6, 1], opacity: [1, 0.3, 1] }} transition={{ duration: 1.4, repeat: Infinity }} className="w-1.5 h-1.5 rounded-full bg-green-400" />
                     <span className="text-[8px] font-black uppercase tracking-widest" style={{ color: lDark ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.35)' }}>LIVE</span>
                   </div>
                   <motion.div
@@ -366,36 +417,24 @@ export default function App() {
               </div>
 
               <div className="relative z-10 flex items-center gap-1.5 mt-4">
-                {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
+                {[1,2,3,4,5,6,7,8].map(i => (
                   <motion.div
-                    key={i}
-                    className="flex-1 h-0.5 rounded-full"
+                    key={i} className="flex-1 h-0.5 rounded-full"
                     animate={{ background: ['rgba(255,106,0,0.08)', 'rgba(255,106,0,0.45)', 'rgba(255,106,0,0.08)'] }}
-                    transition={{ duration: 2.5, repeat: Infinity, delay: i * 0.18, ease: 'easeInOut' }}
+                    transition={{ duration: 2.5, repeat: Infinity, delay: i * 0.18 }}
                   />
                 ))}
-                <motion.span
-                  animate={{ opacity: [0.3, 0.8, 0.3] }}
-                  transition={{ duration: 2.5, repeat: Infinity }}
-                  className="text-[7px] font-black tabular-nums ml-1"
-                  style={{ color: 'rgba(255,106,0,0.6)', fontFamily: 'monospace', whiteSpace: 'nowrap' }}
-                >AI READY</motion.span>
+                <motion.span animate={{ opacity: [0.3, 0.8, 0.3] }} transition={{ duration: 2.5, repeat: Infinity }} className="text-[7px] font-black tabular-nums ml-1" style={{ color: 'rgba(255,106,0,0.6)', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>AI READY</motion.span>
               </div>
             </div>
 
             <div className="px-6 py-5">
               <form onSubmit={handleLogin} className="space-y-4">
                 <div>
-                  <label className="text-[9px] uppercase font-black tracking-widest mb-1.5 block" style={{ color: lMuted }}>
-                    Alamat Surel
-                  </label>
+                  <label className="text-[9px] uppercase font-black tracking-widest mb-1.5 block" style={{ color: lMuted }}>Alamat Surel</label>
                   <input
-                    type="email"
-                    value={loginEmail}
-                    onChange={e => setLoginEmail(e.target.value)}
-                    placeholder="nama@smk.id"
-                    autoComplete="username"
-                    required
+                    type="email" value={loginEmail} onChange={e => setLoginEmail(e.target.value)}
+                    placeholder="nama@smk.id" autoComplete="username" required
                     className="w-full h-12 px-4 rounded-2xl text-sm font-bold placeholder:font-normal outline-none transition-all"
                     style={{ background: lInputBg, border: `1px solid ${lInputBorder}`, color: lInputText, caretColor: '#FF6A00' }}
                     onFocus={e => (e.currentTarget.style.borderColor = 'rgba(255,106,0,0.5)')}
@@ -403,16 +442,10 @@ export default function App() {
                   />
                 </div>
                 <div>
-                  <label className="text-[9px] uppercase font-black tracking-widest mb-1.5 block" style={{ color: lMuted }}>
-                    Kata Sandi
-                  </label>
+                  <label className="text-[9px] uppercase font-black tracking-widest mb-1.5 block" style={{ color: lMuted }}>Kata Sandi</label>
                   <input
-                    type="password"
-                    value={loginPassword}
-                    onChange={e => setLoginPassword(e.target.value)}
-                    placeholder="••••••••"
-                    autoComplete="current-password"
-                    required
+                    type="password" value={loginPassword} onChange={e => setLoginPassword(e.target.value)}
+                    placeholder="••••••••" autoComplete="current-password" required
                     className="w-full h-12 px-4 rounded-2xl text-sm font-bold placeholder:font-normal outline-none transition-all"
                     style={{ background: lInputBg, border: `1px solid ${lInputBorder}`, color: lInputText, caretColor: '#FF6A00' }}
                     onFocus={e => (e.currentTarget.style.borderColor = 'rgba(255,106,0,0.5)')}
@@ -422,39 +455,24 @@ export default function App() {
 
                 <AnimatePresence>
                   {loginError && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
+                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
                       className="text-xs font-bold px-4 py-3 rounded-2xl text-center"
-                      style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', color: '#f87171' }}
-                    >
+                      style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', color: '#f87171' }}>
                       {loginError}
                     </motion.div>
                   )}
                 </AnimatePresence>
 
                 <motion.button
-                  type="submit"
-                  disabled={authLoading}
-                  whileTap={{ scale: 0.98 }}
+                  type="submit" disabled={authLoading} whileTap={{ scale: 0.98 }}
                   className="w-full h-12 rounded-2xl text-white text-sm font-black flex items-center justify-center gap-2 transition-all disabled:opacity-50"
                   style={{ background: 'linear-gradient(135deg, #FF6A00 0%, #cc4a00 100%)', boxShadow: '0 4px 24px rgba(255,106,0,0.35)' }}
                 >
-                  {authLoading ? (
-                    <><Loader2 size={16} className="animate-spin" /> Memverifikasi...</>
-                  ) : (
-                    <><Lock size={15} /> MASUK KE SISTEM</>
-                  )}
+                  {authLoading ? <><Loader2 size={16} className="animate-spin" /> Memverifikasi...</> : <><Lock size={15} /> MASUK KE SISTEM</>}
                 </motion.button>
 
                 <div className="text-center">
-                  <button
-                    type="button"
-                    onClick={() => setShowForgotPassword(true)}
-                    className="text-[11px] font-black transition-all hover:opacity-70"
-                    style={{ color: '#FF6A00' }}
-                  >
+                  <button type="button" onClick={() => setShowForgotPassword(true)} className="text-[11px] font-black transition-all hover:opacity-70" style={{ color: '#FF6A00' }}>
                     Lupa Password?
                   </button>
                 </div>
@@ -473,9 +491,7 @@ export default function App() {
                   { label: 'Siswa', email: 'siswa@smk.id', pass: 'password123', color: '#22c55e' },
                 ].map(acc => (
                   <motion.button
-                    key={acc.email}
-                    type="button"
-                    whileTap={{ scale: 0.94 }}
+                    key={acc.email} type="button" whileTap={{ scale: 0.94 }}
                     onClick={() => { setLoginEmail(acc.email); setLoginPassword(acc.pass); }}
                     className="flex flex-col items-center py-2.5 px-2 rounded-xl transition-all"
                     style={{ background: lChipBg, border: `1px solid ${lChipBorder}` }}
@@ -497,222 +513,141 @@ export default function App() {
         </motion.div>
       </div>
     );
-  }
-
-  // ── MODE SELECTOR (shown after login) ────────────────────────────────────────
-
-  if (token && user && appMode === 'pending') {
-    return (
-      <ModeSelector
-        onSelectMode={handleModeSelect}
-        userName={user.name}
-        userRole={user.role}
-      />
+  } else if (pageKey === 'mode-select') {
+    pageContent = (
+      <ModeSelector onSelectMode={handleModeSelect} userName={user.name} userRole={user.role} />
     );
-  }
+  } else if (pageKey === 'web-app') {
+    pageContent = isAdminRole
+      ? <AdminEnterprise user={user} authToken={token} onLogout={handleLogout} onSwitchMobile={() => handleModeSelect('mobile')} />
+      : <GuruEnterprise user={user} authToken={token} onLogout={handleLogout} onSwitchMobile={() => handleModeSelect('mobile')} />;
+  } else {
+    // mobile-app
+    pageContent = (
+      <div className="flex flex-col h-screen overflow-hidden" style={{ background: '#1C100A', maxWidth: 480, margin: '0 auto', position: 'relative' }}>
+        <DemoBanner authToken={token ?? undefined} />
+        <MobileHeader user={user} title={pageTitle} onNotif={() => {}} onSearch={activeTab !== 'akun' ? () => {} : undefined} />
 
-  // ── ENTERPRISE WEB MODE ───────────────────────────────────────────────────────
+        <div className="flex-1 flex flex-col overflow-hidden relative">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={`${activeTab}-${adminSubPage || ''}`}
+              initial={{ opacity: 0, x: 12 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -12 }}
+              transition={{ duration: 0.18, ease: 'easeOut' }}
+              className="flex-1 flex flex-col overflow-hidden h-full"
+            >
+              {activeTab === 'beranda' && renderBeranda()}
+              {activeTab === 'presensi' && renderPresensi()}
+              {activeTab === 'jadwal' && <JadwalScreen authToken={token!} role={role} />}
+              {activeTab === 'laporan' && <LaporanScreen authToken={token!} role={role} />}
+              {activeTab === 'akun' && <AkunScreen user={user} onLogout={handleLogout} />}
+            </motion.div>
+          </AnimatePresence>
+        </div>
 
-  if (token && user && appMode === 'web') {
-    const ADMIN_ROLES_WEB = ['SUPER_ADMIN', 'TU', 'BK', 'BENDAHARA', 'KEPALA_SEKOLAH'];
-    const isAdminRole = ADMIN_ROLES_WEB.includes(user.role);
-    if (isAdminRole) {
-      return (
-        <AdminEnterprise
-          user={user}
-          authToken={token}
-          onLogout={handleLogout}
-          onSwitchMobile={() => handleModeSelect('mobile')}
-        />
-      );
-    } else {
-      return (
-        <GuruEnterprise
-          user={user}
-          authToken={token}
-          onLogout={handleLogout}
-          onSwitchMobile={() => handleModeSelect('mobile')}
-        />
-      );
-    }
-  }
+        <MobileBottomNav active={activeTab} onChange={(tab) => { setAdminSubPage(null); setActiveTab(tab); }} badge={{}} />
 
-  // ── MAIN APP (mobile mode) ────────────────────────────────────────────────────
-
-  const role = user?.role || 'GURU';
-  const isGuru = role === 'GURU';
-  const isSiswa = role === 'SISWA';
-  const isKepsek = role === 'KEPALA_SEKOLAH';
-  const isAdmin = ADMIN_ROLES.includes(role);
-
-  // Resolve what to show on "beranda" based on role and sub-page
-  const renderBeranda = () => {
-    // Admin special sub-pages
-    if (adminSubPage === 'siswa') return <div className="flex-1 overflow-y-auto pb-24 px-3 pt-2"><StudentModule authToken={token!} /></div>;
-    if (adminSubPage === 'guru') return <div className="flex-1 overflow-y-auto pb-24 px-3 pt-2"><TeacherModule authToken={token!} /></div>;
-    if (adminSubPage === 'monitoring') return <div className="flex-1 overflow-y-auto pb-24 px-3 pt-2"><PusatMonitoringKepsek authToken={token!} /></div>;
-
-    if (isGuru) return <GuruDashboard authToken={token!} user={user} onNavigate={navigate} />;
-    if (isSiswa) return <SiswaDashboard authToken={token!} user={user} onNavigate={navigate} />;
-    if (isKepsek) return <KepsekDashboard authToken={token!} user={user} onNavigate={navigate} />;
-    if (isAdmin) return <AdminDashboard authToken={token!} user={user} role={role} onNavigate={navigate} />;
-    return <AdminDashboard authToken={token!} user={user} role={role} onNavigate={navigate} />;
-  };
-
-  const renderPresensi = () => {
-    if (isSiswa) return <MobileStudentPresensi authToken={token!} user={user} />;
-    if (isKepsek) return (
-      <div className="flex-1 overflow-y-auto pb-24 px-3 pt-2">
-        <PusatMonitoringKepsek authToken={token!} />
-      </div>
-    );
-    return <MobileGuruPresensi authToken={token!} user={user} />;
-  };
-
-  const pageTitle = (() => {
-    if (adminSubPage === 'siswa') return 'Manajemen Siswa';
-    if (adminSubPage === 'guru') return 'Manajemen Guru';
-    if (adminSubPage === 'monitoring') return 'Ruang Kendali';
-    if (activeTab === 'beranda') {
-      if (isKepsek) return 'Ruang Kepala';
-      if (isGuru) return 'Beranda Guru';
-      if (isSiswa) return 'Beranda Siswa';
-      return 'Beranda';
-    }
-    if (activeTab === 'presensi') return 'Presensi';
-    if (activeTab === 'jadwal') return 'Jadwal';
-    if (activeTab === 'laporan') return 'Laporan';
-    if (activeTab === 'akun') return 'Akun Saya';
-    return 'OSDAI';
-  })();
-
-  // Badge counts (can be extended with real data)
-  const badges: Partial<Record<MobileTab, number>> = {};
-
-  return (
-    <div
-      className="flex flex-col h-screen overflow-hidden"
-      style={{ background: '#1C100A', maxWidth: 480, margin: '0 auto', position: 'relative' }}
-    >
-      {/* Demo Mode Banner */}
-      <DemoBanner authToken={token ?? undefined} />
-
-      {/* Fixed Header */}
-      <MobileHeader
-        user={user}
-        title={pageTitle}
-        onNotif={() => {}}
-        onSearch={activeTab !== 'akun' ? () => {} : undefined}
-      />
-
-      {/* Scrollable Content Area */}
-      <div className="flex-1 flex flex-col overflow-hidden relative">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={`${activeTab}-${adminSubPage || ''}`}
-            initial={{ opacity: 0, x: 12 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -12 }}
-            transition={{ duration: 0.18, ease: 'easeOut' }}
-            className="flex-1 flex flex-col overflow-hidden h-full"
-          >
-            {activeTab === 'beranda' && renderBeranda()}
-            {activeTab === 'presensi' && renderPresensi()}
-            {activeTab === 'jadwal' && <JadwalScreen authToken={token!} role={role} />}
-            {activeTab === 'laporan' && <LaporanScreen authToken={token!} role={role} />}
-            {activeTab === 'akun' && <AkunScreen user={user} onLogout={handleLogout} />}
+        {(isAdmin || isGuru || isKepsek) && (
+          <motion.div initial={{ opacity: 0, scale: 0.8, x: -10 }} animate={{ opacity: 1, scale: 1, x: 0 }} transition={{ delay: 0.5 }} className="fixed bottom-[88px] left-4 z-50">
+            <button onClick={() => handleModeSelect('web')} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-black shadow-lg border transition-all active:scale-95" style={{ background: 'rgba(255,106,0,0.9)', color: '#fff', borderColor: 'rgba(255,106,0,0.4)', backdropFilter: 'blur(8px)' }}>
+              🖥 MODE WEB
+            </button>
           </motion.div>
-        </AnimatePresence>
+        )}
+
+        {isGuru && activeTab === 'presensi' && (
+          <motion.div initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="fixed bottom-24 right-5 z-50">
+            <motion.button
+              animate={{ boxShadow: ['0 0 0px rgba(255,106,0,0.5)', '0 0 24px rgba(255,106,0,0.8)', '0 0 0px rgba(255,106,0,0.5)'] }}
+              transition={{ duration: 2, repeat: Infinity }}
+              className="w-14 h-14 rounded-2xl flex items-center justify-center font-black text-white text-2xl shadow-2xl"
+              style={{ background: 'linear-gradient(135deg, #FF6A00, #e55a00)' }}
+              onClick={() => navigate('presensi')}
+            >+</motion.button>
+          </motion.div>
+        )}
+
+        {isAdmin && activeTab === 'beranda' && !adminSubPage && (
+          <motion.div initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="fixed bottom-24 right-5 z-50">
+            <motion.button
+              animate={{ boxShadow: ['0 0 0px rgba(255,106,0,0.4)', '0 0 18px rgba(255,106,0,0.7)', '0 0 0px rgba(255,106,0,0.4)'] }}
+              transition={{ duration: 2.5, repeat: Infinity }}
+              className="w-14 h-14 rounded-2xl flex items-center justify-center font-black text-white text-2xl shadow-2xl"
+              style={{ background: 'linear-gradient(135deg, #FF6A00, #e55a00)' }}
+              onClick={() => navigate('siswa')}
+            >+</motion.button>
+          </motion.div>
+        )}
+
+        {isKepsek && activeTab === 'beranda' && (
+          <motion.div initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="fixed bottom-24 right-5 z-50">
+            <motion.button
+              animate={{ boxShadow: ['0 0 0px rgba(124,58,237,0.5)', '0 0 20px rgba(124,58,237,0.7)', '0 0 0px rgba(124,58,237,0.5)'] }}
+              transition={{ duration: 2, repeat: Infinity }}
+              className="w-14 h-14 rounded-2xl flex items-center justify-center font-black text-white text-xl shadow-2xl"
+              style={{ background: 'linear-gradient(135deg, #7c3aed, #6d28d9)' }}
+              onClick={() => { setAdminSubPage('monitoring'); setActiveTab('beranda'); }}
+            >👁</motion.button>
+          </motion.div>
+        )}
       </div>
+    );
+  }
 
-      {/* Bottom Navigation — always visible */}
-      <MobileBottomNav
-        active={activeTab}
-        onChange={(tab) => {
-          setAdminSubPage(null);
-          setActiveTab(tab);
-        }}
-        badge={badges}
-      />
+  // ── Transition variants ────────────────────────────────────────────────────
+  // Forward: new page slides from right. Backward: from left.
+  const variants = {
+    initial: (d: number) => ({
+      opacity: 0,
+      x: d * 56,
+      scale: 0.97,
+      filter: 'blur(10px)',
+    }),
+    animate: {
+      opacity: 1,
+      x: 0,
+      scale: 1,
+      filter: 'blur(0px)',
+      transition: {
+        duration: 0.42,
+        ease: [0.22, 1, 0.36, 1],
+      },
+    },
+    exit: (d: number) => ({
+      opacity: 0,
+      x: d * -56,
+      scale: 0.98,
+      filter: 'blur(10px)',
+      transition: {
+        duration: 0.28,
+        ease: [0.55, 0, 1, 0.45],
+      },
+    }),
+  };
 
-      {/* Switch to Web Mode button (for admin/guru/kepsek) */}
-      {(isAdmin || isGuru || isKepsek) && (
+  // ── Single AnimatePresence return ─────────────────────────────────────────
+  return (
+    <div style={{ width: '100%', height: '100vh', overflow: 'hidden', position: 'relative', background: '#05030a' }}>
+      <AnimatePresence mode="wait" custom={dir}>
         <motion.div
-          initial={{ opacity: 0, scale: 0.8, x: -10 }}
-          animate={{ opacity: 1, scale: 1, x: 0 }}
-          transition={{ delay: 0.5 }}
-          className="fixed bottom-[88px] left-4 z-50"
+          key={pageKey}
+          custom={dir}
+          variants={variants}
+          initial="initial"
+          animate="animate"
+          exit="exit"
+          style={{
+            position: 'absolute',
+            inset: 0,
+            overflow: pageKey === 'landing' ? 'auto' : pageKey === 'login' ? 'auto' : 'hidden',
+            willChange: 'transform, opacity, filter',
+          }}
         >
-          <button
-            onClick={() => handleModeSelect('web')}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-black shadow-lg border transition-all active:scale-95"
-            style={{ background: 'rgba(255,106,0,0.9)', color: '#fff', borderColor: 'rgba(255,106,0,0.4)', backdropFilter: 'blur(8px)' }}
-            title="Beralih ke Mode Web Enterprise"
-          >
-            🖥 MODE WEB
-          </button>
+          {pageContent}
         </motion.div>
-      )}
-
-      {/* Floating Action Button for Guru */}
-      {isGuru && activeTab === 'presensi' && (
-        <motion.div
-          initial={{ scale: 0, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="fixed bottom-24 right-5 z-50"
-        >
-          <motion.button
-            animate={{ boxShadow: ['0 0 0px rgba(255,106,0,0.5)', '0 0 24px rgba(255,106,0,0.8)', '0 0 0px rgba(255,106,0,0.5)'] }}
-            transition={{ duration: 2, repeat: Infinity }}
-            className="w-14 h-14 rounded-2xl flex items-center justify-center font-black text-white text-2xl shadow-2xl"
-            style={{ background: 'linear-gradient(135deg, #FF6A00, #e55a00)' }}
-            title="Buka Presensi Baru"
-            onClick={() => navigate('presensi')}
-          >
-            +
-          </motion.button>
-        </motion.div>
-      )}
-
-      {/* Floating Action Button for Admin: Add Data */}
-      {isAdmin && (activeTab === 'beranda') && !adminSubPage && (
-        <motion.div
-          initial={{ scale: 0, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="fixed bottom-24 right-5 z-50"
-        >
-          <motion.button
-            animate={{ boxShadow: ['0 0 0px rgba(255,106,0,0.4)', '0 0 18px rgba(255,106,0,0.7)', '0 0 0px rgba(255,106,0,0.4)'] }}
-            transition={{ duration: 2.5, repeat: Infinity }}
-            className="w-14 h-14 rounded-2xl flex items-center justify-center font-black text-white text-2xl shadow-2xl"
-            style={{ background: 'linear-gradient(135deg, #FF6A00, #e55a00)' }}
-            title="Tambah Data"
-            onClick={() => navigate('siswa')}
-          >
-            +
-          </motion.button>
-        </motion.div>
-      )}
-
-      {/* Floating Action Button for Kepsek */}
-      {isKepsek && activeTab === 'beranda' && (
-        <motion.div
-          initial={{ scale: 0, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="fixed bottom-24 right-5 z-50"
-        >
-          <motion.button
-            animate={{ boxShadow: ['0 0 0px rgba(124,58,237,0.5)', '0 0 20px rgba(124,58,237,0.7)', '0 0 0px rgba(124,58,237,0.5)'] }}
-            transition={{ duration: 2, repeat: Infinity }}
-            className="w-14 h-14 rounded-2xl flex items-center justify-center font-black text-white text-xl shadow-2xl"
-            style={{ background: 'linear-gradient(135deg, #7c3aed, #6d28d9)' }}
-            title="Lihat Audit"
-            onClick={() => { setAdminSubPage('monitoring'); setActiveTab('beranda'); }}
-          >
-            👁
-          </motion.button>
-        </motion.div>
-      )}
+      </AnimatePresence>
     </div>
   );
 }
