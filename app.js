@@ -1,55 +1,44 @@
 /**
- * OSDAI — Phusion Passenger / cPanel Entry Point
+ * OSDAI — LiteSpeed / cPanel Entry Point
  *
- * Passenger calls: node app.js
+ * LiteSpeed calls require() on this file (via lsnode.js).
  *
- * What it does:
- *  1. Loads .env from disk (cPanel has no system-level env injection)
- *  2. Forces NODE_ENV=production so Express serves /dist, not Vite
- *  3. Registers the tsx ESM loader for runtime TypeScript transpilation
- *  4. Boots the full Express + Socket.IO server (server.ts)
+ * CONSTRAINTS (Node 22 + LiteSpeed lsnode.js):
+ *  1. No top-level await  → ERR_REQUIRE_ASYNC_MODULE
+ *  2. No module.register('tsx/esm') → tsx uses deprecated --loader hook
+ *                                      internally → crash on Node 22
  *
- * Deployment sequence on cPanel terminal:
- *  1. git pull
- *  2. npm install
- *  3. npx prisma generate
- *  4. npm run build          → compiles React to /dist
- *  5. npx prisma migrate deploy → applies DB migrations
- *  6. mkdir -p uploads logs  → ensure writable dirs exist
- *  7. Restart app in cPanel Node.js Selector
+ * SOLUTION: tsx/esm/api tsImport() — programmatic API that transpiles
+ *  TypeScript on-the-fly WITHOUT registering any global loader hooks.
+ *  Works in Node 22, works when loaded via require().
+ *
+ * Deploy sequence (run in cPanel terminal, inside public_html/osdai):
+ *   git pull && npm run cpanel:install
+ *   → then click RESTART in Node.js Selector
  */
 
 import { config as dotenvConfig } from 'dotenv';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { register } from 'node:module';
+import { tsImport } from 'tsx/esm/api';
 
-// Load .env from the directory containing app.js — not process.cwd(),
-// which Phusion Passenger can change unpredictably.
+// Resolve .env relative to this file — not process.cwd() which
+// LiteSpeed may change to an unpredictable path.
 const __appDir = dirname(fileURLToPath(import.meta.url));
 dotenvConfig({ path: join(__appDir, '.env') });
 
-// Always production on cPanel — Passenger doesn't set NODE_ENV.
+// LiteSpeed does not inject these — set them here.
 if (!process.env.NODE_ENV) {
   process.env.NODE_ENV = 'production';
 }
-// Also honour APP_ENV for our own env validator.
 if (!process.env.APP_ENV) {
   process.env.APP_ENV = 'production';
 }
 
-// Register tsx ESM loader so TypeScript files can be imported at runtime.
-// MUST use import.meta.url as base — NOT pathToFileURL('./') which uses
-// process.cwd() that Phusion Passenger changes to an unpredictable path.
-register('tsx/esm', new URL('./', import.meta.url));
-
-// Boot the server. All API routes, Socket.IO, static serving, and SPA
-// fallback are defined inside server.ts — nothing is duplicated here.
-//
-// CRITICAL: NO top-level await here. LiteSpeed/cPanel loads app.js via
-// require() (Node 22 ERR_REQUIRE_ASYNC_MODULE if top-level await exists).
-// Dynamic import() returns a Promise — no await needed at module level.
-import('./server.ts').catch(err => {
+// tsImport() compiles server.ts at runtime using tsx's internal transform
+// engine. It does NOT call module.register() / --loader / --import — all of
+// which have compatibility issues with Node 22 + LiteSpeed.
+tsImport('./server.ts', import.meta.url).catch(err => {
   console.error('[OSDAI] Fatal startup error:', err);
   process.exit(1);
 });

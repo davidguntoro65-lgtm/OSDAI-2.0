@@ -33,7 +33,9 @@ description: Key fixes and decisions for deploying OSDAI on cPanel/Passenger at 
 
 12. **`app.js` tsx register base URL** — Changed `register('tsx/esm', pathToFileURL('./'))` → `register('tsx/esm', new URL('./', import.meta.url))`. `pathToFileURL('./')` uses `process.cwd()` which Passenger/LiteSpeed changes.
 
-15. **`app.js` top-level await (CRITICAL — ERR_REQUIRE_ASYNC_MODULE)** — cPanel uses LiteSpeed (`/usr/local/lsws/fcgi-bin/lsnode.js`) which loads `app.js` via `require()`. Node 22 can `require()` ESM but NOT if the module has top-level `await`. Changed `try { await import('./server.ts') } catch {}` → `import('./server.ts').catch(...)`. No top-level await = LiteSpeed can require() it fine. This was the definitive fix.
+15. **`app.js` top-level await (ERR_REQUIRE_ASYNC_MODULE)** — LiteSpeed loads `app.js` via `require()`. Node 22 can `require()` ESM but NOT if top-level `await` exists. Fixed: `import('./server.ts').catch(...)` — no top-level await.
+
+16. **`app.js` module.register tsx (Node 22 FATAL)** — `module.register('tsx/esm', ...)` internally uses deprecated `--loader` hook. Node 22 + tsx v4.22 throws: "tsx must be loaded with --import instead of --loader". DEFINITIVE FIX: Remove `register()` call entirely. Replace with `tsImport('./server.ts', import.meta.url)` from `tsx/esm/api`. This is tsx's programmatic API — no loader hooks, no `--import` flag, fully compatible with Node 22 + LiteSpeed require().
 
 13. **`emailService.ts` top-level transporter** — Changed from module-level `const transporter = nodemailer.createTransport(...)` to a lazy `getTransporter()` function. Top-level call with undefined SMTP vars caused module import issues on cPanel.
 
