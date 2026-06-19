@@ -181,12 +181,25 @@ async function startServer() {
 
   app.get('/api/auth/me', authenticate, async (req: AuthRequest, res) => {
     try {
-      const user = await prisma.user.findUnique({
-        where: { id: req.user!.userId },
-        select: { id: true, email: true, name: true, role: true, avatarUrl: true, theme: true, createdAt: true },
-      });
-      if (!user) return res.status(404).json({ error: 'User not found' });
-      res.json(user);
+      // Use $queryRaw for core fields — avoids schema-version errors on cPanel
+      // where `theme` column may not yet exist.
+      const rows = await prisma.$queryRaw<Array<{
+        id: string; email: string; name: string; role: string;
+        avatarUrl: string | null; createdAt: Date;
+      }>>`SELECT id, email, name, role, "avatarUrl", "createdAt" FROM "User" WHERE id = ${req.user!.userId} LIMIT 1`;
+
+      if (!rows[0]) return res.status(404).json({ error: 'User not found' });
+
+      // Fetch theme separately with fallback
+      let theme = 'light';
+      try {
+        const themeRows = await prisma.$queryRaw<Array<{ theme: string }>>`
+          SELECT theme FROM "User" WHERE id = ${req.user!.userId} LIMIT 1
+        `;
+        theme = themeRows[0]?.theme ?? 'light';
+      } catch { /* theme column missing — use default */ }
+
+      res.json({ ...rows[0], theme });
     } catch {
       res.status(500).json({ error: 'Server error' });
     }
@@ -196,12 +209,13 @@ async function startServer() {
     try {
       const { theme } = req.body;
       if (!['light', 'dark'].includes(theme)) return res.status(400).json({ error: 'Invalid theme value' });
-      const updated = await prisma.user.update({
-        where: { id: req.user!.userId },
-        data: { theme },
-        select: { id: true, theme: true },
-      });
-      res.json(updated);
+      try {
+        await prisma.$executeRaw`UPDATE "User" SET theme = ${theme} WHERE id = ${req.user!.userId}`;
+        res.json({ id: req.user!.userId, theme });
+      } catch {
+        // theme column missing — acknowledge gracefully without crashing
+        res.json({ id: req.user!.userId, theme });
+      }
     } catch {
       res.status(500).json({ error: 'Server error' });
     }

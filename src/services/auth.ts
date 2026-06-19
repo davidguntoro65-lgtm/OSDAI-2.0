@@ -22,14 +22,29 @@ export const AuthService = {
   },
 
   async login(email: string, password: string, deviceInfo: { userAgent?: string; ip?: string }) {
-    const user = await prisma.user.findUnique({
-      where: { email },
-    });
+    // Use $queryRaw to fetch only auth-critical columns — immune to schema
+    // version differences (e.g. missing `theme` on older cPanel deployments).
+    const rows = await prisma.$queryRaw<Array<{
+      id: string; email: string; password: string;
+      role: string; name: string; avatarUrl: string | null;
+    }>>`SELECT id, email, password, role, name, "avatarUrl" FROM "User" WHERE email = ${email} LIMIT 1`;
 
-    if (!user || !(await this.verifyPassword(password, user.password))) {
+    const coreUser = rows[0] ?? null;
+    if (!coreUser || !(await this.verifyPassword(password, coreUser.password))) {
       throw new Error('Invalid credentials');
     }
 
+    // Fetch theme separately — column may not exist on older DB schema (non-fatal)
+    let theme = 'light';
+    try {
+      const themeRows = await prisma.$queryRaw<Array<{ theme: string }>>`
+        SELECT theme FROM "User" WHERE id = ${coreUser.id} LIMIT 1
+      `;
+      theme = themeRows[0]?.theme ?? 'light';
+    } catch { /* theme column missing — use default */ }
+
+    const { password: _pw, ...safeUser } = coreUser;
+    const user = { ...safeUser, theme, role: coreUser.role as Role };
     const { accessToken, refreshToken } = this.generateTokens(user.id, user.role);
 
     // Track Session
@@ -69,7 +84,7 @@ export const AuthService = {
   async refresh(token: string) {
     const storedToken = await prisma.refreshToken.findUnique({
       where: { token },
-      include: { user: true },
+      include: { user: { select: { id: true, role: true } } },
     });
 
     if (!storedToken || storedToken.isRevoked || storedToken.expiresAt < new Date()) {

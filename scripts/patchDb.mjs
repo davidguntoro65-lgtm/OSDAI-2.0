@@ -40,18 +40,44 @@ function loadEnv() {
   }
 }
 
+/* ─────────────────────────────────────────────────────────────────────────
+ * Helper: check whether a column exists using information_schema.
+ * More reliable than ADD COLUMN IF NOT EXISTS on restricted shared hosts.
+ * ───────────────────────────────────────────────────────────────────────── */
+async function columnExists(prisma, table, column) {
+  try {
+    const rows = await prisma.$queryRaw`
+      SELECT 1 FROM information_schema.columns
+      WHERE table_name = ${table} AND column_name = ${column} LIMIT 1
+    `;
+    return rows.length > 0;
+  } catch { return false; }
+}
+
+async function tableExists(prisma, table) {
+  try {
+    const rows = await prisma.$queryRaw`
+      SELECT 1 FROM information_schema.tables
+      WHERE table_name = ${table} AND table_type = 'BASE TABLE' LIMIT 1
+    `;
+    return rows.length > 0;
+  } catch { return false; }
+}
+
 /* ─── All patches — each is idempotent ──────────────────────────────────── */
 const PATCHES = [
   /* ── Migration 2: add_user_theme ─────────────────────────────────────── */
   {
     id: 'user.theme',
     desc: 'User.theme column',
-    sql: `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "theme" TEXT NOT NULL DEFAULT 'light'`,
+    check: (p) => columnExists(p, 'User', 'theme'),
+    sql: `ALTER TABLE "User" ADD COLUMN "theme" TEXT NOT NULL DEFAULT 'light'`,
   },
   {
     id: 'timetable.source',
     desc: 'TimetableVersion.source column',
-    sql: `ALTER TABLE "TimetableVersion" ADD COLUMN IF NOT EXISTS "source" TEXT NOT NULL DEFAULT 'REAL'`,
+    check: (p) => columnExists(p, 'TimetableVersion', 'source'),
+    sql: `ALTER TABLE "TimetableVersion" ADD COLUMN "source" TEXT NOT NULL DEFAULT 'REAL'`,
   },
   {
     id: 'PasswordResetOTP',
@@ -211,6 +237,16 @@ export async function patchDatabase(prisma, verbose = false) {
 
   for (const patch of PATCHES) {
     try {
+      // If patch has a pre-flight check, skip if already applied
+      if (patch.check) {
+        const exists = await patch.check(prisma);
+        if (exists) {
+          if (verbose) console.log(`  ${warn}  ${patch.desc}  ${C.dim}(already exists)${C.reset}`);
+          skipped++;
+          continue;
+        }
+      }
+
       await prisma.$executeRawUnsafe(patch.sql.trim());
       if (verbose) console.log(`  ${ok}  ${patch.desc}`);
       applied++;
@@ -228,7 +264,7 @@ export async function patchDatabase(prisma, verbose = false) {
         if (verbose) console.log(`  ${warn}  ${patch.desc}  ${C.dim}(already exists)${C.reset}`);
         skipped++;
       } else {
-        if (verbose) console.log(`  ${fail}  ${patch.desc}\n       ${C.red}${msg.slice(0, 120)}${C.reset}`);
+        if (verbose) console.log(`  ${fail}  ${patch.desc}\n       ${C.red}${msg.slice(0, 240)}${C.reset}`);
         failed++;
       }
     }
