@@ -33,6 +33,10 @@ description: Key fixes and decisions for deploying OSDAI on cPanel/Passenger at 
 
 12. **`cpanel:install` script order fixed** — Now: `npm install → prisma generate → npm run build → prisma migrate deploy → mkdir -p uploads logs`. Build before migrate ensures Vite works; mkdir ensures writable dirs exist.
 
+13. **`app.js` dotenv explicit path (CRITICAL)** — Changed from `import 'dotenv/config'` to `dotenvConfig({ path: join(__appDir, '.env') })` where `__appDir = dirname(fileURLToPath(import.meta.url))`. Passenger can change `process.cwd()` making `dotenv/config` fail to find `.env`, causing `initEnv()` to crash with `process.exit(1)`. This was the root cause of the 404 bug — app crashing silently, Apache serving dist/ statically, API calls returning 404.
+
+14. **`auth.ts` REFRESH_SECRET key name (CRITICAL)** — Changed `process.env.REFRESH_SECRET` to `process.env.JWT_REFRESH_SECRET || process.env.REFRESH_SECRET`. The `.env` uses `JWT_REFRESH_SECRET` as the key name; reading wrong name caused refresh tokens to be signed with hardcoded fallback.
+
 ## cPanel Node.js Selector settings (exact)
 - Node.js version: **22.x** (≥22.13 required for pdfjs-dist)
 - Application mode: **Production**

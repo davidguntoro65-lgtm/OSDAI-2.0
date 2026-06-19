@@ -19,9 +19,16 @@
  *  7. Restart app in cPanel Node.js Selector
  */
 
-import 'dotenv/config';
+import { config as dotenvConfig } from 'dotenv';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import { register } from 'node:module';
 import { pathToFileURL } from 'node:url';
+
+// Load .env from the directory containing app.js — not process.cwd(),
+// which Phusion Passenger can change unpredictably.
+const __appDir = dirname(fileURLToPath(import.meta.url));
+dotenvConfig({ path: join(__appDir, '.env') });
 
 // Always production on cPanel — Passenger doesn't set NODE_ENV.
 if (!process.env.NODE_ENV) {

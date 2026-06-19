@@ -4,7 +4,7 @@ import { prisma } from '../lib/prisma';
 import { Role } from '@prisma/client';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_edunexus_alpha';
-const REFRESH_SECRET = process.env.REFRESH_SECRET || 'super_refresh_edunexus_alpha';
+const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || process.env.REFRESH_SECRET || 'super_refresh_edunexus_alpha';
 
 export const AuthService = {
   async hashPassword(password: string) {
