@@ -69,10 +69,22 @@ LOG_DIR=logs
 
 ## Deploy sequence on cPanel (terminal, inside public_html/osdai)
 ```bash
-git pull
-npm run cpanel:install
+git pull && npm run cpanel:install
 ```
 Then click **RESTART** in cPanel Node.js Selector.
+
+## cPanel management scripts
+| Command | Function |
+|---|---|
+| `npm run cpanel:install` | Full deploy: install → build → migrate → verify → save ref |
+| `npm run cpanel:verify` | 8 health checks (env, DB, JWT, build, dirs, health endpoint) |
+| `npm run cpanel:status` | Dashboard: deploy info, memory, disk, DB stats, health |
+| `npm run cpanel:rollback` | Reset to last-good commit → rebuild → verify |
+
+## Rollback target priority (rollbackCpanel.mjs)
+1. `git ORIG_HEAD` — set automatically by `git pull`
+2. `.deploy-last-good` — written by `cpanel:install` after successful verify
+3. `HEAD~1` — one commit before current (last resort)
 
 ## Verification after deploy
 - `https://osdai.smkn1wonogiri.sch.id/api/health` → `{"status":"ok","env":"production","version":"2.0.0"}`
