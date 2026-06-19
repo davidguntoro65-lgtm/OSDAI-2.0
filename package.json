@@ -26,7 +26,8 @@
     "cpanel:setup": "npm install && npx prisma generate && npm run build && npx prisma migrate deploy && mkdir -p uploads logs && node --import tsx/esm prisma/seed.ts",
     "cpanel:verify": "node scripts/verifyCpanel.mjs",
     "cpanel:rollback": "node scripts/rollbackCpanel.mjs",
-    "cpanel:status": "node scripts/statusCpanel.mjs"
+    "cpanel:status": "node scripts/statusCpanel.mjs",
+    "cpanel:patch-db": "node scripts/patchDb.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
