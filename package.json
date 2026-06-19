@@ -22,9 +22,10 @@
     "deploy": "node --import tsx/esm scripts/deploy.mjs",
     "backup": "node --import tsx/esm scripts/backup.mjs",
     "validate:env": "node --import tsx/esm scripts/validateEnv.mjs",
-    "cpanel:install": "npm install && npx prisma generate && npm run build && npx prisma migrate deploy && mkdir -p uploads logs && npm run cpanel:verify",
+    "cpanel:install": "npm install && npx prisma generate && npm run build && npx prisma migrate deploy && mkdir -p uploads logs && npm run cpanel:verify && node scripts/saveDeployRef.mjs",
     "cpanel:setup": "npm install && npx prisma generate && npm run build && npx prisma migrate deploy && mkdir -p uploads logs && node --import tsx/esm prisma/seed.ts",
-    "cpanel:verify": "node scripts/verifyCpanel.mjs"
+    "cpanel:verify": "node scripts/verifyCpanel.mjs",
+    "cpanel:rollback": "node scripts/rollbackCpanel.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",

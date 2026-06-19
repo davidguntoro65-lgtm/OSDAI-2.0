@@ -43,6 +43,9 @@ Thumbs.db
 # Prisma generated
 prisma/generated/
 
+# Deploy tracking — written by cpanel:install / cpanel:rollback (server-only)
+.deploy-last-good
+
 # Replit internal
 .local/
 .cache/
