@@ -31,7 +31,9 @@ description: Key fixes and decisions for deploying OSDAI on cPanel/Passenger at 
 
 11. **`app.js` dotenv explicit path** — Changed from `import 'dotenv/config'` to `dotenvConfig({ path: join(__appDir, '.env') })` using `dirname(fileURLToPath(import.meta.url))`. Passenger changes `process.cwd()` so dotenv/config fails to find `.env`.
 
-12. **`app.js` tsx register base URL (CRITICAL — root 503 cause)** — Changed `register('tsx/esm', pathToFileURL('./'))` → `register('tsx/esm', new URL('./', import.meta.url))`. `pathToFileURL('./')` uses `process.cwd()` which Passenger changes. The tsx ESM loader couldn't be found → `server.ts` import threw "Unknown file extension '.ts'" → app crashed → Passenger retried ~5x → 503 after 20s.
+12. **`app.js` tsx register base URL** — Changed `register('tsx/esm', pathToFileURL('./'))` → `register('tsx/esm', new URL('./', import.meta.url))`. `pathToFileURL('./')` uses `process.cwd()` which Passenger/LiteSpeed changes.
+
+15. **`app.js` top-level await (CRITICAL — ERR_REQUIRE_ASYNC_MODULE)** — cPanel uses LiteSpeed (`/usr/local/lsws/fcgi-bin/lsnode.js`) which loads `app.js` via `require()`. Node 22 can `require()` ESM but NOT if the module has top-level `await`. Changed `try { await import('./server.ts') } catch {}` → `import('./server.ts').catch(...)`. No top-level await = LiteSpeed can require() it fine. This was the definitive fix.
 
 13. **`emailService.ts` top-level transporter** — Changed from module-level `const transporter = nodemailer.createTransport(...)` to a lazy `getTransporter()` function. Top-level call with undefined SMTP vars caused module import issues on cPanel.
 

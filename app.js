@@ -45,9 +45,11 @@ register('tsx/esm', new URL('./', import.meta.url));
 
 // Boot the server. All API routes, Socket.IO, static serving, and SPA
 // fallback are defined inside server.ts — nothing is duplicated here.
-try {
-  await import('./server.ts');
-} catch (err) {
+//
+// CRITICAL: NO top-level await here. LiteSpeed/cPanel loads app.js via
+// require() (Node 22 ERR_REQUIRE_ASYNC_MODULE if top-level await exists).
+// Dynamic import() returns a Promise — no await needed at module level.
+import('./server.ts').catch(err => {
   console.error('[OSDAI] Fatal startup error:', err);
   process.exit(1);
-}
+});
