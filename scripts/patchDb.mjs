@@ -1,15 +1,13 @@
 #!/usr/bin/env node
 /**
  * OSDAI — Database Patch Script
- * Run: npm run cpanel:patch-db
+ * Run standalone: npm run cpanel:patch-db
+ * Imported by:   app.js (auto-runs on every startup)
  *
  * Directly applies missing DDL using IF NOT EXISTS / DO $$ guards.
- * Safe to run multiple times — idempotent.
+ * Safe to run multiple times — fully idempotent.
  * Does NOT touch prisma migration history.
  * Does NOT modify or delete any existing data.
- *
- * Covers all columns/tables that may be missing on a cPanel DB
- * that was initialised before migrations 2 & 3 ran properly.
  */
 
 import fs from 'node:fs';
@@ -60,13 +58,13 @@ const PATCHES = [
     desc: 'PasswordResetOTP table',
     sql: `
 CREATE TABLE IF NOT EXISTS "PasswordResetOTP" (
-  "id"           TEXT        NOT NULL,
-  "userId"       TEXT        NOT NULL,
-  "otpHash"      TEXT        NOT NULL,
+  "id"           TEXT         NOT NULL,
+  "userId"       TEXT         NOT NULL,
+  "otpHash"      TEXT         NOT NULL,
   "expiredAt"    TIMESTAMP(3) NOT NULL,
-  "attemptCount" INTEGER     NOT NULL DEFAULT 0,
-  "resendCount"  INTEGER     NOT NULL DEFAULT 0,
-  "isUsed"       BOOLEAN     NOT NULL DEFAULT false,
+  "attemptCount" INTEGER      NOT NULL DEFAULT 0,
+  "resendCount"  INTEGER      NOT NULL DEFAULT 0,
+  "isUsed"       BOOLEAN      NOT NULL DEFAULT false,
   "ipAddress"    TEXT,
   "deviceInfo"   TEXT,
   "createdAt"    TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -95,12 +93,12 @@ END $$`,
     desc: 'SecurityAuditLog table',
     sql: `
 CREATE TABLE IF NOT EXISTS "SecurityAuditLog" (
-  "id"         TEXT        NOT NULL,
+  "id"         TEXT         NOT NULL,
   "userId"     TEXT,
-  "action"     TEXT        NOT NULL,
+  "action"     TEXT         NOT NULL,
   "ipAddress"  TEXT,
   "deviceInfo" TEXT,
-  "status"     TEXT        NOT NULL,
+  "status"     TEXT         NOT NULL,
   "metadata"   TEXT,
   "createdAt"  TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT "SecurityAuditLog_pkey" PRIMARY KEY ("id")
@@ -127,9 +125,9 @@ END $$`,
     desc: 'SystemConfig table',
     sql: `
 CREATE TABLE IF NOT EXISTS "SystemConfig" (
-  "id"        TEXT        NOT NULL,
-  "key"       TEXT        NOT NULL,
-  "value"     TEXT        NOT NULL,
+  "id"        TEXT         NOT NULL,
+  "key"       TEXT         NOT NULL,
+  "value"     TEXT         NOT NULL,
   "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT "SystemConfig_pkey" PRIMARY KEY ("id")
 )`,
@@ -199,33 +197,14 @@ END $$`,
   },
 ];
 
-/* ─── Main ───────────────────────────────────────────────────────────────── */
-async function main() {
-  loadEnv();
-
-  console.log(`\n${C.bold}${C.cyan}  OSDAI — Database Patch${C.reset}`);
-  console.log(`  ${C.dim}${new Date().toISOString()}${C.reset}`);
-  console.log(SEP);
-
-  if (!process.env.DATABASE_URL) {
-    console.error(`\n  ${fail}  DATABASE_URL is not set — cannot connect.\n`);
-    process.exit(1);
-  }
-
-  const { PrismaClient } = await import('@prisma/client');
-  const prisma = new PrismaClient({ log: [] });
-
-  try {
-    await prisma.$queryRaw`SELECT 1`;
-    console.log(`\n  ${ok}  Connected to database.`);
-  } catch (e) {
-    console.error(`\n  ${fail}  DB connection failed: ${e.message}\n`);
-    await prisma.$disconnect();
-    process.exit(1);
-  }
-
-  console.log(`\n${C.bold}  Applying ${PATCHES.length} patch(es)…${C.reset}\n`);
-
+/* ─────────────────────────────────────────────────────────────────────────
+ * EXPORTED FUNCTION — called by app.js on every startup
+ *
+ * @param  prisma  an already-connected PrismaClient instance
+ * @param  verbose print per-patch lines (default false for startup use)
+ * @returns { applied, skipped, failed }
+ * ───────────────────────────────────────────────────────────────────────── */
+export async function patchDatabase(prisma, verbose = false) {
   let applied = 0;
   let skipped = 0;
   let failed  = 0;
@@ -233,50 +212,85 @@ async function main() {
   for (const patch of PATCHES) {
     try {
       await prisma.$executeRawUnsafe(patch.sql.trim());
-      console.log(`  ${ok}  ${patch.desc}`);
+      if (verbose) console.log(`  ${ok}  ${patch.desc}`);
       applied++;
     } catch (e) {
       const msg = e.message ?? '';
-      // "already exists" errors from PostgreSQL — safe to ignore
-      if (
+      const alreadyExists =
         msg.includes('already exists') ||
         msg.includes('duplicate column') ||
         msg.includes('duplicate key') ||
-        msg.includes('42701') || // duplicate_column
-        msg.includes('42P07') || // duplicate_table
-        msg.includes('42710')    // duplicate_object (constraint/index)
-      ) {
-        console.log(`  ${warn}  ${patch.desc}  ${C.dim}(already exists, skipped)${C.reset}`);
+        msg.includes('42701') ||
+        msg.includes('42P07') ||
+        msg.includes('42710');
+
+      if (alreadyExists) {
+        if (verbose) console.log(`  ${warn}  ${patch.desc}  ${C.dim}(already exists)${C.reset}`);
         skipped++;
       } else {
-        console.log(`  ${fail}  ${patch.desc}`);
-        console.log(`       ${C.red}${msg.slice(0, 120)}${C.reset}`);
+        if (verbose) console.log(`  ${fail}  ${patch.desc}\n       ${C.red}${msg.slice(0, 120)}${C.reset}`);
         failed++;
       }
     }
   }
 
-  await prisma.$disconnect();
-
-  console.log(`\n${SEP}`);
-  console.log(`  Applied : ${C.green}${applied}${C.reset}`);
-  console.log(`  Skipped : ${C.yellow}${skipped}${C.reset}  (already existed)`);
-  console.log(`  Failed  : ${failed > 0 ? C.red : C.dim}${failed}${C.reset}`);
-  console.log(SEP);
-
-  if (failed > 0) {
-    console.log(`\n${SEPE}`);
-    console.log(`  ${fail}  ${C.bold}${failed} patch(es) failed — check errors above.${C.reset}`);
-    console.log(`${SEPE}\n`);
-    process.exit(1);
-  }
-
-  console.log(`\n${SEPG}`);
-  console.log(`  ${ok}  ${C.bold}${C.green}All patches applied. Restart the app in Node.js Selector.${C.reset}`);
-  console.log(`${SEPG}\n`);
+  return { applied, skipped, failed };
 }
 
-main().catch(err => {
-  console.error(`\n  ${fail}  Unexpected error: ${err.message}\n`);
-  process.exit(1);
-});
+/* ─────────────────────────────────────────────────────────────────────────
+ * CLI ENTRYPOINT — only runs when this file is executed directly
+ * ───────────────────────────────────────────────────────────────────────── */
+const isMain = process.argv[1] &&
+  path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url));
+
+if (isMain) {
+  (async () => {
+    loadEnv();
+
+    console.log(`\n${C.bold}${C.cyan}  OSDAI — Database Patch${C.reset}`);
+    console.log(`  ${C.dim}${new Date().toISOString()}${C.reset}`);
+    console.log(SEP);
+
+    if (!process.env.DATABASE_URL) {
+      console.error(`\n  ${fail}  DATABASE_URL is not set — cannot connect.\n`);
+      process.exit(1);
+    }
+
+    const { PrismaClient } = await import('@prisma/client');
+    const prisma = new PrismaClient({ log: [] });
+
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      console.log(`\n  ${ok}  Connected to database.`);
+    } catch (e) {
+      console.error(`\n  ${fail}  DB connection failed: ${e.message}\n`);
+      await prisma.$disconnect();
+      process.exit(1);
+    }
+
+    console.log(`\n${C.bold}  Applying ${PATCHES.length} patch(es)…${C.reset}\n`);
+
+    const { applied, skipped, failed } = await patchDatabase(prisma, true);
+    await prisma.$disconnect();
+
+    console.log(`\n${SEP}`);
+    console.log(`  Applied : ${C.green}${applied}${C.reset}`);
+    console.log(`  Skipped : ${C.yellow}${skipped}${C.reset}  (already existed)`);
+    console.log(`  Failed  : ${failed > 0 ? C.red : C.dim}${failed}${C.reset}`);
+    console.log(SEP);
+
+    if (failed > 0) {
+      console.log(`\n${SEPE}`);
+      console.log(`  ${fail}  ${C.bold}${failed} patch(es) failed — check errors above.${C.reset}`);
+      console.log(`${SEPE}\n`);
+      process.exit(1);
+    }
+
+    console.log(`\n${SEPG}`);
+    console.log(`  ${ok}  ${C.bold}${C.green}All patches applied. Restart the app in Node.js Selector.${C.reset}`);
+    console.log(`${SEPG}\n`);
+  })().catch(err => {
+    console.error(`\n  ${fail}  Unexpected error: ${err.message}\n`);
+    process.exit(1);
+  });
+}
