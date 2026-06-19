@@ -23,7 +23,6 @@ import { config as dotenvConfig } from 'dotenv';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { register } from 'node:module';
-import { pathToFileURL } from 'node:url';
 
 // Load .env from the directory containing app.js — not process.cwd(),
 // which Phusion Passenger can change unpredictably.
@@ -40,8 +39,9 @@ if (!process.env.APP_ENV) {
 }
 
 // Register tsx ESM loader so TypeScript files can be imported at runtime.
-// tsx is in "dependencies" (not devDependencies) so it is always present.
-register('tsx/esm', pathToFileURL('./'));
+// MUST use import.meta.url as base — NOT pathToFileURL('./') which uses
+// process.cwd() that Phusion Passenger changes to an unpredictable path.
+register('tsx/esm', new URL('./', import.meta.url));
 
 // Boot the server. All API routes, Socket.IO, static serving, and SPA
 // fallback are defined inside server.ts — nothing is duplicated here.

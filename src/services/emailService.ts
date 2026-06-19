@@ -1,19 +1,21 @@
 import nodemailer from 'nodemailer';
 
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: parseInt(process.env.SMTP_PORT || '587'),
-  secure: parseInt(process.env.SMTP_PORT || '587') === 465,
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-  tls: { rejectUnauthorized: false },
-});
+function getTransporter() {
+  return nodemailer.createTransport({
+    host: process.env.SMTP_HOST || 'localhost',
+    port: parseInt(process.env.SMTP_PORT || '587'),
+    secure: parseInt(process.env.SMTP_PORT || '587') === 465,
+    auth: process.env.SMTP_USER ? {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    } : undefined,
+    tls: { rejectUnauthorized: false },
+  });
+}
 
 export async function verifyEmailConnection(): Promise<boolean> {
   try {
-    await transporter.verify();
+    await getTransporter().verify();
     return true;
   } catch {
     return false;
@@ -117,7 +119,7 @@ export async function sendOTPEmail(opts: {
 </body>
 </html>`;
 
-  await transporter.sendMail({
+  await getTransporter().sendMail({
     from: `"OSDAI SMK N 1 Wonogiri" <${process.env.SMTP_USER}>`,
     to,
     subject: `[OSDAI] Kode OTP Reset Password — ${otp}`,
@@ -171,7 +173,7 @@ export async function sendPasswordChangedEmail(opts: { to: string; name: string;
 </body>
 </html>`;
 
-  await transporter.sendMail({
+  await getTransporter().sendMail({
     from: `"OSDAI SMK N 1 Wonogiri" <${process.env.SMTP_USER}>`,
     to,
     subject: '[OSDAI] Password Anda Berhasil Diperbarui',

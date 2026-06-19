@@ -7,35 +7,35 @@ description: Key fixes and decisions for deploying OSDAI on cPanel/Passenger at 
 
 **Why:** cPanel/Passenger shared hosting has specific constraints that differ from VPS/Docker.
 
-## Critical fixes applied
+## Critical fixes applied (in order of discovery)
 
-1. **Prisma binaryTargets** — Added `linux-musl-openssl-3.0.x`, `debian-openssl-3.0.x`, `rhel-openssl-3.0.x` in `prisma/schema.prisma`. Without this Prisma client won't run on cPanel Linux.
+1. **Prisma binaryTargets** — Added `linux-musl-openssl-3.0.x`, `debian-openssl-3.0.x`, `rhel-openssl-3.0.x` in `prisma/schema.prisma`.
 
-2. **isProduction() case-insensitive** — `domain.ts` and `server.ts` both now use `.toLowerCase() === 'production'`. cPanel Passenger may set `NODE_ENV=Production` (capital P).
+2. **isProduction() case-insensitive** — Uses `.toLowerCase() === 'production'`. Passenger may set `NODE_ENV=Production`.
 
-3. **Socket.IO transports** — Server set to `['polling', 'websocket']` + `allowEIO3: true`. Shared hosting proxies often can't upgrade WebSocket, so polling must be first.
+3. **Socket.IO transports** — `['polling', 'websocket']` + `allowEIO3: true`. Polling must be first.
 
-4. **Midtrans isProduction** — Reads `MIDTRANS_IS_PRODUCTION === 'true'`, not hardcoded.
+4. **APP_PORT on cPanel** — Must NOT be set in `.env`. Passenger sets `PORT`; code reads `APP_PORT || PORT || 5000`.
 
-5. **APP_PORT on cPanel** — Must NOT be set in `.env`. Passenger sets `PORT` env var; our code reads `APP_PORT || PORT || 5000`.
+5. **dist path uses `__dirname`** — Changed from `process.cwd()` which is unreliable under Passenger.
 
-6. **dist path uses `__dirname`** — `server.ts` production static file path changed from `process.cwd()` to `__dirname`. `process.cwd()` is unreliable under Passenger on cPanel.
+6. **`.htaccess`** — `PassengerEnabled on`, `PassengerStartupFile app.js`, `PassengerAppType node`. Rules block server files, pass `/api/` to Passenger, fall back to `dist/` when Passenger not running.
 
-7. **`.htaccess` RewriteRule removed** — The `RewriteRule ^(.*)$ app.js [QSA,L]` was causing Apache to serve `app.js` as plain text when Passenger wasn't active. Removed entirely. Added `PassengerStartupFile app.js`, `PassengerAppType node`, `PassengerMaxPoolSize 1`. Removed hardcoded `PassengerNodejs` path — cPanel Node.js Selector writes this line automatically.
+7. **AI services conditional httpOptions** — Only pass `httpOptions` when `AI_INTEGRATIONS_GEMINI_BASE_URL` is defined.
 
-8. **AI services conditional httpOptions** — `enterprise.ts` and `intelligence.ts` only pass `httpOptions` to GoogleGenAI when `AI_INTEGRATIONS_GEMINI_BASE_URL` is defined (Replit). On cPanel it's undefined and was causing startup warnings. Fixed with conditional spread.
+8. **`app.js` sets `APP_ENV=production`** — Required by our `initEnv()` validator alongside `NODE_ENV`.
 
-9. **`uploads/` and `logs/` in git** — Added `.gitkeep` files so these directories exist on fresh clone. `.gitignore` updated to `uploads/*` / `!uploads/.gitkeep` pattern.
+9. **`/api/health` endpoint** — Added for post-deploy verification.
 
-10. **`app.js` sets `APP_ENV=production`** — Added alongside `NODE_ENV=production` since our validator checks `APP_ENV`. Also added `try/catch` around `await import('./server.ts')`.
+10. **`auth.ts` REFRESH_SECRET key name** — Changed `process.env.REFRESH_SECRET` → `process.env.JWT_REFRESH_SECRET || process.env.REFRESH_SECRET`.
 
-11. **`/api/health` endpoint** — Added to `server.ts` for post-deploy verification at `https://osdai.smkn1wonogiri.sch.id/api/health`.
+11. **`app.js` dotenv explicit path** — Changed from `import 'dotenv/config'` to `dotenvConfig({ path: join(__appDir, '.env') })` using `dirname(fileURLToPath(import.meta.url))`. Passenger changes `process.cwd()` so dotenv/config fails to find `.env`.
 
-12. **`cpanel:install` script order fixed** — Now: `npm install → prisma generate → npm run build → prisma migrate deploy → mkdir -p uploads logs`. Build before migrate ensures Vite works; mkdir ensures writable dirs exist.
+12. **`app.js` tsx register base URL (CRITICAL — root 503 cause)** — Changed `register('tsx/esm', pathToFileURL('./'))` → `register('tsx/esm', new URL('./', import.meta.url))`. `pathToFileURL('./')` uses `process.cwd()` which Passenger changes. The tsx ESM loader couldn't be found → `server.ts` import threw "Unknown file extension '.ts'" → app crashed → Passenger retried ~5x → 503 after 20s.
 
-13. **`app.js` dotenv explicit path (CRITICAL)** — Changed from `import 'dotenv/config'` to `dotenvConfig({ path: join(__appDir, '.env') })` where `__appDir = dirname(fileURLToPath(import.meta.url))`. Passenger can change `process.cwd()` making `dotenv/config` fail to find `.env`, causing `initEnv()` to crash with `process.exit(1)`. This was the root cause of the 404 bug — app crashing silently, Apache serving dist/ statically, API calls returning 404.
+13. **`emailService.ts` top-level transporter** — Changed from module-level `const transporter = nodemailer.createTransport(...)` to a lazy `getTransporter()` function. Top-level call with undefined SMTP vars caused module import issues on cPanel.
 
-14. **`auth.ts` REFRESH_SECRET key name (CRITICAL)** — Changed `process.env.REFRESH_SECRET` to `process.env.JWT_REFRESH_SECRET || process.env.REFRESH_SECRET`. The `.env` uses `JWT_REFRESH_SECRET` as the key name; reading wrong name caused refresh tokens to be signed with hardcoded fallback.
+14. **`src/lib/prisma.ts` query logging** — Disabled `log: ['query']` in production. Stdout flood under Passenger's pipe buffer.
 
 ## cPanel Node.js Selector settings (exact)
 - Node.js version: **22.x** (≥22.13 required for pdfjs-dist)
@@ -45,19 +45,35 @@ description: Key fixes and decisions for deploying OSDAI on cPanel/Passenger at 
 - Startup file: `app.js`
 
 ## cPanel .env required keys
-- `DATABASE_URL` — PostgreSQL at `127.0.0.1:5432` with `?sslmode=disable`
-- `APP_ENV=production`
-- `APP_URL=https://osdai.smkn1wonogiri.sch.id`
-- `CORS_ORIGINS=https://osdai.smkn1wonogiri.sch.id`
-- `JWT_SECRET` + `JWT_REFRESH_SECRET`
-- `GEMINI_API_KEY`
-- Do NOT set `APP_PORT` — let Passenger set `PORT`
+```
+DATABASE_URL=postgresql://smknwon2_absen_user:PASSWORD@127.0.0.1:5432/smknwon2_absen_db?sslmode=disable
+JWT_SECRET=<long random string>
+JWT_REFRESH_SECRET=<different long random string>
+GEMINI_API_KEY=<key>
+APP_ENV=production
+APP_URL=https://osdai.smkn1wonogiri.sch.id
+CORS_ORIGINS=https://osdai.smkn1wonogiri.sch.id
+MIDTRANS_IS_PRODUCTION=false
+EMAIL_PROVIDER=smtp
+STORAGE_PROVIDER=local
+UPLOAD_DIR=uploads
+QR_SECRET=<random string>
+LOG_LEVEL=info
+LOG_DIR=logs
+```
+- Do NOT set `APP_PORT` — Passenger sets `PORT`
 
-## Deploy sequence on cPanel
-1. `git pull` in `public_html/osdai`
-2. `npm run cpanel:install` (install → prisma generate → build → migrate → mkdir)
-3. Restart app in cPanel Node.js Selector
+## Deploy sequence on cPanel (terminal, inside public_html/osdai)
+```bash
+git pull
+npm run cpanel:install
+```
+Then click **RESTART** in cPanel Node.js Selector.
 
 ## Verification after deploy
-- `https://osdai.smkn1wonogiri.sch.id` → login page
-- `https://osdai.smkn1wonogiri.sch.id/api/health` → `{"status":"ok"}`
+- `https://osdai.smkn1wonogiri.sch.id/api/health` → `{"status":"ok","env":"production","version":"2.0.0"}`
+
+## How to read Passenger crash logs
+```bash
+tail -100 ~/logs/osdai.smkn1wonogiri.sch.id.error.log
+```
