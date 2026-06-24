@@ -135,16 +135,24 @@ export default function StudentModule({ authToken }: { authToken: string }) {
     window.print();
   };
 
-  const handleExport = () => {
-    const csvContent = "data:text/csv;charset=utf-8," 
-      + ["Name,NIS,NISN,Major,Class"].join(",") + "\n"
-      + students.map(s => `${s.user.name},${s.nis},${s.nisn},${s.class?.major?.name},${s.class?.name}`).join("\n");
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "student_report.csv");
-    document.body.appendChild(link);
-    link.click();
+  const handleExport = async () => {
+    try {
+      const params = new URLSearchParams();
+      if (search) params.set('search', search);
+      const res = await fetch(`/api/students/export?${params}`, {
+        headers: { Authorization: `Bearer ${authToken}` },
+      });
+      if (!res.ok) throw new Error('Export gagal');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `data_siswa_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      alert('Gagal mengunduh file export.');
+    }
   };
 
   return (

@@ -361,6 +361,198 @@ async function startServer() {
     }
   });
 
+  // GET /api/students/export — professional A4 Excel export
+  app.get('/api/students/export', authenticate, authorize([Role.SUPER_ADMIN, Role.TU, Role.KEPALA_SEKOLAH]), async (req, res) => {
+    try {
+      const { search, majorId, classId, status } = req.query;
+
+      // Fetch ALL students (no pagination)
+      const { items } = await StudentService.getAll({
+        search: search as string,
+        majorId: majorId as string,
+        classId: classId as string,
+        status: status as string,
+        page: 1,
+        limit: 99999,
+      });
+
+      const ExcelJS = await import('exceljs');
+      const wb = new ExcelJS.Workbook();
+      wb.creator = 'OSDAI v2.0';
+      wb.lastModifiedBy = 'OSDAI';
+      wb.created = new Date();
+
+      const ws = wb.addWorksheet('Data Siswa', {
+        pageSetup: {
+          paperSize: 9, // A4
+          orientation: 'portrait',
+          fitToPage: true,
+          fitToWidth: 1,
+          fitToHeight: 0,
+          margins: {
+            left: 0.7, right: 0.7,
+            top: 0.9, bottom: 0.9,
+            header: 0.4, footer: 0.4,
+          },
+        },
+      });
+
+      const exportDate = new Date().toLocaleDateString('id-ID', {
+        day: '2-digit', month: 'long', year: 'numeric',
+      });
+
+      // ── Column widths ──────────────────────────────────────────────
+      ws.columns = [
+        { key: 'no',     width: 5  },
+        { key: 'nama',   width: 28 },
+        { key: 'nis',    width: 14 },
+        { key: 'nisn',   width: 14 },
+        { key: 'kelas',  width: 14 },
+        { key: 'jurusan',width: 22 },
+        { key: 'tahun',  width: 14 },
+        { key: 'status', width: 12 },
+      ];
+
+      // ── Row 1: School name ─────────────────────────────────────────
+      ws.mergeCells('A1:H1');
+      const r1 = ws.getCell('A1');
+      r1.value = 'SMKN 1 WONOGIRI';
+      r1.font = { name: 'Calibri', bold: true, size: 16, color: { argb: 'FF1A1A1A' } };
+      r1.alignment = { horizontal: 'center', vertical: 'middle' };
+      ws.getRow(1).height = 28;
+
+      // ── Row 2: Document title ──────────────────────────────────────
+      ws.mergeCells('A2:H2');
+      const r2 = ws.getCell('A2');
+      r2.value = 'DAFTAR DATA SISWA';
+      r2.font = { name: 'Calibri', bold: true, size: 13, color: { argb: 'FF1A1A1A' } };
+      r2.alignment = { horizontal: 'center', vertical: 'middle' };
+      ws.getRow(2).height = 22;
+
+      // ── Row 3: Sub-info ────────────────────────────────────────────
+      ws.mergeCells('A3:H3');
+      const r3 = ws.getCell('A3');
+      r3.value = `Sistem Informasi Akademik · Dicetak: ${exportDate} · Total: ${items.length} siswa`;
+      r3.font = { name: 'Calibri', size: 9, italic: true, color: { argb: 'FF6B6B6B' } };
+      r3.alignment = { horizontal: 'center', vertical: 'middle' };
+      ws.getRow(3).height = 16;
+
+      // ── Row 4: Spacer ──────────────────────────────────────────────
+      ws.getRow(4).height = 6;
+
+      // ── Row 5: Table header ────────────────────────────────────────
+      const headerLabels = ['No', 'Nama Lengkap', 'NIS', 'NISN', 'Kelas', 'Kompetensi Keahlian', 'Tahun Ajaran', 'Status'];
+      const hRow = ws.getRow(5);
+      hRow.height = 22;
+      headerLabels.forEach((label, i) => {
+        const cell = hRow.getCell(i + 1);
+        cell.value = label;
+        cell.font = { name: 'Calibri', bold: true, size: 9, color: { argb: 'FFFFFFFF' } };
+        cell.alignment = { horizontal: i === 1 ? 'left' : 'center', vertical: 'middle' };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1A1A1A' } };
+        cell.border = {
+          top:    { style: 'thin', color: { argb: 'FF2D2D2D' } },
+          bottom: { style: 'thin', color: { argb: 'FF2D2D2D' } },
+          left:   { style: 'thin', color: { argb: 'FF2D2D2D' } },
+          right:  { style: 'thin', color: { argb: 'FF2D2D2D' } },
+        };
+      });
+
+      // ── Data rows ──────────────────────────────────────────────────
+      const statusColor: Record<string, string> = {
+        ACTIVE:    'FF15803D',
+        GRADUATED: 'FF1D4ED8',
+        DROPOUT:   'FFB91C1C',
+        SUSPENDED: 'FFB45309',
+      };
+      const statusLabel: Record<string, string> = {
+        ACTIVE: 'Aktif', GRADUATED: 'Lulus', DROPOUT: 'DO', SUSPENDED: 'Skors',
+      };
+
+      items.forEach((s: any, idx: number) => {
+        const isEven = idx % 2 === 0;
+        const rowNum = idx + 6;
+        const dRow = ws.getRow(rowNum);
+        dRow.height = 18;
+
+        const bgColor = isEven ? 'FFFAFAF9' : 'FFFFFFFF';
+        const vals = [
+          idx + 1,
+          s.user?.name ?? '-',
+          s.nis ?? '-',
+          s.nisn ?? '-',
+          s.class?.name ?? '-',
+          s.class?.major?.name ?? '-',
+          s.class?.academicYear?.name ?? '-',
+          statusLabel[s.status] ?? s.status,
+        ];
+
+        vals.forEach((val, ci) => {
+          const cell = dRow.getCell(ci + 1);
+          cell.value = val;
+          cell.font = {
+            name: 'Calibri',
+            size: 9,
+            bold: ci === 7,
+            color: { argb: ci === 7 ? (statusColor[s.status] ?? 'FF1A1A1A') : 'FF1A1A1A' },
+          };
+          cell.alignment = {
+            horizontal: ci === 1 ? 'left' : 'center',
+            vertical: 'middle',
+          };
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
+          cell.border = {
+            top:    { style: 'hair', color: { argb: 'FFEBEBEB' } },
+            bottom: { style: 'hair', color: { argb: 'FFEBEBEB' } },
+            left:   { style: 'hair', color: { argb: 'FFEBEBEB' } },
+            right:  { style: 'hair', color: { argb: 'FFEBEBEB' } },
+          };
+        });
+      });
+
+      // ── Bottom border on last data row ─────────────────────────────
+      if (items.length > 0) {
+        const lastRow = ws.getRow(items.length + 5);
+        for (let ci = 1; ci <= 8; ci++) {
+          lastRow.getCell(ci).border = {
+            ...lastRow.getCell(ci).border,
+            bottom: { style: 'thin', color: { argb: 'FF1A1A1A' } },
+          };
+        }
+      }
+
+      // ── Footer row ─────────────────────────────────────────────────
+      const footerRowNum = items.length + 7;
+      ws.mergeCells(`A${footerRowNum}:H${footerRowNum}`);
+      const fCell = ws.getCell(`A${footerRowNum}`);
+      fCell.value = 'Dokumen ini digenerate otomatis oleh Sistem OSDAI v2.0 · Tidak memerlukan tanda tangan basah';
+      fCell.font = { name: 'Calibri', size: 8, italic: true, color: { argb: 'FFAAAAAA' } };
+      fCell.alignment = { horizontal: 'center' };
+
+      // ── Header decoration (top border on row 1) ────────────────────
+      for (let ci = 1; ci <= 8; ci++) {
+        ws.getRow(1).getCell(ci).border = {
+          top: { style: 'medium', color: { argb: 'FF1A1A1A' } },
+        };
+      }
+
+      // ── Freeze pane at row 6 (keep header visible) ─────────────────
+      ws.views = [{ state: 'frozen', xSplit: 0, ySplit: 5, topLeftCell: 'A6', activeCell: 'A6' }];
+
+      // ── Print header/footer ────────────────────────────────────────
+      ws.headerFooter.oddHeader = '&C&"Calibri,Bold"&12DAFTAR DATA SISWA — SMKN 1 WONOGIRI';
+      ws.headerFooter.oddFooter = `&LDicetak: ${exportDate}&RHalaman &P dari &N`;
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="data_siswa_${new Date().toISOString().slice(0,10)}.xlsx"`);
+      await wb.xlsx.write(res);
+      res.end();
+    } catch (err: any) {
+      logger.info('EXPORT', `Student export error: ${err.message}`);
+      res.status(500).json({ error: 'Gagal mengekspor data siswa.' });
+    }
+  });
+
   // GET /api/students/bulk-template — download Excel import template
   app.get('/api/students/bulk-template', authenticate, authorize([Role.SUPER_ADMIN, Role.TU]), async (_req, res) => {
     try {
