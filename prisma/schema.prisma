@@ -679,18 +679,19 @@ model InventoryItem {
 }
 
 model ClassSession {
-  id            String   @id @default(uuid())
-  teacherId     String
-  classId       String
-  subjectId     String
-  scheduleId    String?
-  startTime     DateTime @default(now())
-  endTime       DateTime?
-  signalStatus  String   @default("ACTIVE") // ACTIVE, CLOSED
-  sessionToken  String   @unique
-  integrityScore Float   @default(1.0)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id                String    @id @default(uuid())
+  teacherId         String
+  classId           String
+  subjectId         String
+  scheduleId        String?
+  startTime         DateTime  @default(now())
+  officialStartTime DateTime?  // Waktu mulai resmi dari jadwal (TimetableConfig), bukan waktu guru buka sesi
+  endTime           DateTime?
+  signalStatus      String    @default("ACTIVE") // ACTIVE, CLOSED
+  sessionToken      String    @unique
+  integrityScore    Float     @default(1.0)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
   
   teacher       Teacher  @relation(fields: [teacherId], references: [id])
   class         Class    @relation(fields: [classId], references: [id])
@@ -704,7 +705,7 @@ model StudentAttendance {
   studentId         String
   sessionId         String
   timestamp         DateTime @default(now())
-  attendanceStatus  String   // HADIR, TERLAMBAT, ALFA, INVALID
+  attendanceStatus  String   // HADIR, TERLAMBAT, ALFA, INVALID, IZIN, SAKIT
   responseLatency   Int?     // in seconds
   gpsLatitude       Float?
   gpsLongitude      Float?
@@ -712,6 +713,7 @@ model StudentAttendance {
   deviceFingerprint String?
   integrityScore    Float    @default(1.0)
   confirmationStatus String  @default("UNCONFIRMED") // UNCONFIRMED, CONFIRMED
+  note              String?  // Keterangan guru (misal: alasan izin/sakit, koreksi manual)
   createdAt         DateTime @default(now())
 
   student           Student  @relation(fields: [studentId], references: [id])

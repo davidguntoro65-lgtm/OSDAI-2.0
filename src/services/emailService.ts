@@ -128,6 +128,48 @@ export async function sendOTPEmail(opts: {
   });
 }
 
+export async function sendAlfaNotificationEmail(opts: {
+  to: string;
+  parentName: string;
+  studentName: string;
+  subjectName: string;
+  className: string;
+  teacherName: string;
+}): Promise<boolean> {
+  const date = new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  const html = `
+<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
+body{font-family:Arial,sans-serif;background:#f9fafb;padding:24px;color:#1e293b}
+.card{background:white;border-radius:12px;padding:24px;max-width:520px;margin:0 auto;border:1px solid #e2e8f0}
+.badge{display:inline-block;background:#FEE2E2;color:#DC2626;padding:4px 10px;border-radius:6px;font-size:12px;font-weight:bold}
+td{padding:6px 12px 6px 0;font-size:13px;vertical-align:top}
+</style></head>
+<body><div class="card">
+  <p style="font-size:11px;color:#FF6A00;font-weight:bold;text-transform:uppercase;letter-spacing:1px;">OSDAI · SMKN 1 Wonogiri</p>
+  <h2 style="margin-top:4px;">Notifikasi Ketidakhadiran Siswa</h2>
+  <p>Yth. <strong>${opts.parentName}</strong>,</p>
+  <p>Putra/putri Anda tercatat <strong>tidak hadir (ALFA)</strong> pada sesi berikut:</p>
+  <table><tr><td style="color:#64748b">Nama</td><td><strong>${opts.studentName}</strong></td></tr>
+  <tr><td style="color:#64748b">Kelas</td><td>${opts.className}</td></tr>
+  <tr><td style="color:#64748b">Mata Pelajaran</td><td>${opts.subjectName}</td></tr>
+  <tr><td style="color:#64748b">Tanggal</td><td>${date}</td></tr>
+  <tr><td style="color:#64748b">Guru</td><td>${opts.teacherName}</td></tr></table>
+  <br><span class="badge">⚠️ TIDAK HADIR (ALFA)</span>
+  <p style="margin-top:16px;font-size:13px">Jika putra/putri Anda sakit atau ada keperluan, harap menghubungi wali kelas agar dapat diinput keterangan SAKIT/IZIN.</p>
+  <p style="font-size:11px;color:#94a3b8;margin-top:20px">Email otomatis dari sistem OSDAI. Harap tidak membalas.</p>
+</div></body></html>`;
+  const transporter = getTransporter();
+  try {
+    await transporter.sendMail({
+      from: `"OSDAI SMKN 1 Wonogiri" <${process.env.SMTP_USER}>`,
+      to: opts.to,
+      subject: `[OSDAI] Notifikasi: ${opts.studentName} Tidak Hadir — ${opts.subjectName}`,
+      html,
+    });
+    return true;
+  } catch { return false; }
+}
+
 export async function sendPasswordChangedEmail(opts: { to: string; name: string; ipAddress?: string }): Promise<void> {
   const { to, name, ipAddress } = opts;
   const now = new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', dateStyle: 'full', timeStyle: 'short' });

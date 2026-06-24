@@ -1,8 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
-import { Radio, Users, CheckCircle2, X, Clock, QrCode, RefreshCcw, Zap, AlertTriangle, BrainCircuit, Loader2, ChevronDown, Monitor, Shield } from 'lucide-react';
+import { Radio, Users, CheckCircle2, X, Clock, RefreshCcw, BrainCircuit, Loader2, Monitor, Shield, Edit3, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 import { C } from '@/lib/themeC';
+
+const STATUS_OPTIONS = [
+  { value: 'HADIR',     label: 'Hadir',      color: '#10B981', bg: '#F0FDF4' },
+  { value: 'TERLAMBAT', label: 'Terlambat',  color: '#F59E0B', bg: '#FFFBEB' },
+  { value: 'IZIN',      label: 'Izin',       color: '#0ea5e9', bg: '#EFF6FF' },
+  { value: 'SAKIT',     label: 'Sakit',      color: '#8B5CF6', bg: '#F5F3FF' },
+  { value: 'ALFA',      label: 'Alfa',       color: '#EF4444', bg: '#FEF2F2' },
+];
 
 export default function GuruPresensiKelas({ authToken, user }: { authToken: string; user: any }) {
   const [view, setView] = useState<'idle' | 'active'>('idle');
@@ -20,6 +28,12 @@ export default function GuruPresensiKelas({ authToken, user }: { authToken: stri
   const [aiInsights, setAiInsights] = useState('');
   const [loadingAI, setLoadingAI] = useState(false);
   const [todaySchedule, setTodaySchedule] = useState<any>(null);
+  // Status override state
+  const [overrideId, setOverrideId] = useState<string | null>(null);
+  const [overrideStatus, setOverrideStatus] = useState('');
+  const [overrideNote, setOverrideNote] = useState('');
+  const [overriding, setOverriding] = useState(false);
+
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const headers = { Authorization: `Bearer ${authToken}`, 'Content-Type': 'application/json' };
 
@@ -93,7 +107,7 @@ export default function GuruPresensiKelas({ authToken, user }: { authToken: stri
       if (res.ok) {
         if (pollRef.current) clearInterval(pollRef.current);
         setView('idle'); setSession(null); setAttendances([]);
-        showToast('Sesi presensi ditutup');
+        showToast('Sesi presensi ditutup — data telah disinkron ke rekap');
       }
     } finally { setClosing(false); }
   };
@@ -112,14 +126,49 @@ export default function GuruPresensiKelas({ authToken, user }: { authToken: stri
     } finally { setLoadingAI(false); }
   };
 
+  const openOverride = (att: any) => {
+    setOverrideId(att.id);
+    setOverrideStatus(att.attendanceStatus);
+    setOverrideNote(att.note || '');
+  };
+
+  const submitOverride = async () => {
+    if (!overrideId) return;
+    setOverriding(true);
+    try {
+      const res = await fetch(`/api/intelligence/attendance/${overrideId}/status`, {
+        method: 'PATCH', headers,
+        body: JSON.stringify({ status: overrideStatus, note: overrideNote || undefined }),
+      });
+      if (res.ok) {
+        showToast('Status berhasil diubah');
+        setOverrideId(null);
+        fetchAttendances(session.id);
+      } else {
+        const e = await res.json();
+        showToast(e.error || 'Gagal mengubah status', 'err');
+      }
+    } finally { setOverriding(false); }
+  };
+
   const hadir = attendances.filter(a => a.attendanceStatus === 'HADIR').length;
   const terlambat = attendances.filter(a => a.attendanceStatus === 'TERLAMBAT').length;
   const alfa = attendances.filter(a => a.attendanceStatus === 'ALFA').length;
+  const izin = attendances.filter(a => a.attendanceStatus === 'IZIN').length;
+  const sakit = attendances.filter(a => a.attendanceStatus === 'SAKIT').length;
   const total = attendances.length;
-  const pending = attendances.filter(a => a.confirmationStatus === 'PENDING').length;
 
   const selectedClass = classes.find(c => c.id === selClass);
   const selectedSubject = subjects.find(s => s.id === selSubject);
+
+  const statusMeta: Record<string, { color: string; bg: string }> = {
+    HADIR:     { color: '#10B981', bg: '#F0FDF4' },
+    TERLAMBAT: { color: '#F59E0B', bg: '#FFFBEB' },
+    ALFA:      { color: '#EF4444', bg: '#FEF2F2' },
+    IZIN:      { color: '#0ea5e9', bg: '#EFF6FF' },
+    SAKIT:     { color: '#8B5CF6', bg: '#F5F3FF' },
+    INVALID:   { color: '#6B7280', bg: '#F9FAFB' },
+  };
 
   return (
     <div className="p-6 space-y-6">
@@ -129,6 +178,58 @@ export default function GuruPresensiKelas({ authToken, user }: { authToken: stri
           {toastType === 'ok' ? <CheckCircle2 size={14} /> : <X size={14} />} {toast}
         </motion.div>
       )}
+
+      {/* Override modal */}
+      <AnimatePresence>
+        {overrideId && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center"
+            style={{ background: 'rgba(0,0,0,0.4)' }}
+            onClick={e => { if (e.target === e.currentTarget) setOverrideId(null); }}>
+            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+              className="rounded-2xl p-6 w-full max-w-sm shadow-xl"
+              style={{ background: C.card, border: `1px solid ${C.border}` }}>
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-sm font-black" style={{ color: C.text }}>Ubah Status Kehadiran</p>
+                <button onClick={() => setOverrideId(null)} className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-gray-100">
+                  <X size={14} style={{ color: C.textMuted }} />
+                </button>
+              </div>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-wide mb-1.5 block" style={{ color: C.textMuted }}>Status Baru</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {STATUS_OPTIONS.map(opt => (
+                      <button key={opt.value} onClick={() => setOverrideStatus(opt.value)}
+                        className="py-1.5 rounded-lg text-[11px] font-bold border transition-all"
+                        style={{
+                          background: overrideStatus === opt.value ? opt.bg : 'transparent',
+                          color: opt.color,
+                          borderColor: overrideStatus === opt.value ? opt.color : C.border,
+                        }}>
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-wide mb-1 block" style={{ color: C.textMuted }}>Keterangan (opsional)</label>
+                  <input value={overrideNote} onChange={e => setOverrideNote(e.target.value)}
+                    placeholder="Contoh: Surat izin terlampir"
+                    className="w-full px-3 py-2 rounded-lg text-xs border outline-none"
+                    style={{ borderColor: C.border, color: C.text, background: C.bg }} />
+                </div>
+                <button onClick={submitOverride} disabled={overriding || !overrideStatus}
+                  className="w-full py-2.5 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2"
+                  style={{ background: overriding ? '#FED7AA' : C.primary }}>
+                  {overriding && <Loader2 size={13} className="animate-spin" />}
+                  Simpan Perubahan
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="flex items-center justify-between">
         <div>
@@ -148,7 +249,7 @@ export default function GuruPresensiKelas({ authToken, user }: { authToken: stri
         )}
       </div>
 
-      {/* Idle view – form to open session */}
+      {/* Idle view */}
       {view === 'idle' && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="rounded-xl p-6" style={{ background: C.card, border: `1px solid ${C.border}` }}>
@@ -158,7 +259,6 @@ export default function GuruPresensiKelas({ authToken, user }: { authToken: stri
               </div>
               <p className="text-sm font-bold" style={{ color: C.text }}>Buka Sesi Presensi</p>
             </div>
-
             {todaySchedule && (
               <div className="mb-4 p-3 rounded-xl" style={{ background: '#FFF4ED', border: '1px solid #FED7AA' }}>
                 <p className="text-[10px] font-bold uppercase tracking-wide mb-1" style={{ color: C.primary }}>Jadwal Terdeteksi</p>
@@ -166,7 +266,6 @@ export default function GuruPresensiKelas({ authToken, user }: { authToken: stri
                 <p className="text-xs" style={{ color: C.textMuted }}>{todaySchedule.class?.name} · Jam {todaySchedule.periodStart}–{todaySchedule.periodEnd}</p>
               </div>
             )}
-
             <div className="space-y-3">
               <div>
                 <label className="text-[10px] font-bold uppercase tracking-wide mb-1 block" style={{ color: C.textMuted }}>Kelas *</label>
@@ -190,7 +289,6 @@ export default function GuruPresensiKelas({ authToken, user }: { authToken: stri
               </button>
             </div>
           </div>
-
           <div className="rounded-xl p-6" style={{ background: C.card, border: `1px solid ${C.border}` }}>
             <p className="text-sm font-bold mb-3" style={{ color: C.text }}>Cara Kerja OSDAI Signal</p>
             <div className="space-y-3">
@@ -236,15 +334,16 @@ export default function GuruPresensiKelas({ authToken, user }: { authToken: stri
           </div>
 
           {/* Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-3 md:grid-cols-5 gap-2">
             {[
-              { label: 'Hadir', value: hadir, color: '#10B981', bg: '#F0FDF4' },
-              { label: 'Terlambat', value: terlambat, color: '#F59E0B', bg: '#FFFBEB' },
-              { label: 'Alfa', value: alfa, color: '#EF4444', bg: '#FEF2F2' },
-              { label: 'Belum Konfirm', value: pending, color: '#6366f1', bg: '#EEF2FF' },
+              { label: 'Hadir',      value: hadir,     color: '#10B981', bg: '#F0FDF4' },
+              { label: 'Terlambat',  value: terlambat, color: '#F59E0B', bg: '#FFFBEB' },
+              { label: 'Izin',       value: izin,      color: '#0ea5e9', bg: '#EFF6FF' },
+              { label: 'Sakit',      value: sakit,     color: '#8B5CF6', bg: '#F5F3FF' },
+              { label: 'Alfa',       value: alfa,      color: '#EF4444', bg: '#FEF2F2' },
             ].map(s => (
               <div key={s.label} className="rounded-xl p-3 text-center" style={{ background: s.bg, border: `1px solid ${s.color}20` }}>
-                <div className="text-2xl font-black" style={{ color: s.color }}>{s.value}</div>
+                <div className="text-xl font-black" style={{ color: s.color }}>{s.value}</div>
                 <div className="text-[10px] font-bold mt-0.5" style={{ color: s.color }}>{s.label}</div>
               </div>
             ))}
@@ -278,20 +377,22 @@ export default function GuruPresensiKelas({ authToken, user }: { authToken: stri
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead><tr style={{ background: C.bg }}>
-                    {['Nama Siswa', 'Status', 'Waktu', 'GPS', 'Integrity', 'Konfirmasi', 'Aksi'].map(h => (
+                    {['Nama Siswa', 'Status', 'Waktu', 'GPS', 'Integrity', 'Keterangan', 'Aksi'].map(h => (
                       <th key={h} className="px-4 py-2.5 text-left font-bold" style={{ color: C.textMuted }}>{h}</th>
                     ))}
                   </tr></thead>
                   <tbody>
                     {attendances.map((a, i) => {
-                      const statusColor = { HADIR: '#10B981', TERLAMBAT: '#F59E0B', ALFA: '#EF4444', IZIN: '#0ea5e9' }[a.attendanceStatus] || '#6B7280';
+                      const meta = statusMeta[a.attendanceStatus] || { color: '#6B7280', bg: '#F9FAFB' };
                       return (
                         <tr key={a.id || i} className="border-t hover:bg-gray-50" style={{ borderColor: '#F3F4F6' }}>
                           <td className="px-4 py-2.5 font-semibold" style={{ color: C.text }}>{a.student?.user?.name || '—'}</td>
                           <td className="px-4 py-2.5">
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold" style={{ background: `${statusColor}15`, color: statusColor }}>{a.attendanceStatus || '—'}</span>
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold" style={{ background: meta.bg, color: meta.color }}>{a.attendanceStatus || '—'}</span>
                           </td>
-                          <td className="px-4 py-2.5 text-[10px] font-mono" style={{ color: C.textMuted }}>{a.timestamp ? new Date(a.timestamp).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '—'}</td>
+                          <td className="px-4 py-2.5 font-mono text-[10px]" style={{ color: C.textMuted }}>
+                            {a.timestamp ? new Date(a.timestamp).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '—'}
+                          </td>
                           <td className="px-4 py-2.5">
                             {a.gpsLat ? <span className="text-[10px] font-bold" style={{ color: '#10B981' }}>✓ Valid</span> : <span style={{ color: C.textMuted }}>—</span>}
                           </td>
@@ -303,15 +404,17 @@ export default function GuruPresensiKelas({ authToken, user }: { authToken: stri
                               <span className="text-[9px]" style={{ color: C.textMuted }}>{Math.round((a.integrityScore || 0) * 100)}%</span>
                             </div>
                           </td>
-                          <td className="px-4 py-2.5">
-                            <span className="text-[10px] font-bold" style={{ color: a.confirmationStatus === 'CONFIRMED' ? '#10B981' : '#F59E0B' }}>
-                              {a.confirmationStatus || 'PENDING'}
-                            </span>
+                          <td className="px-4 py-2.5 max-w-[120px]">
+                            {a.note ? (
+                              <span className="text-[10px] italic truncate block" style={{ color: C.textMuted }} title={a.note}>{a.note}</span>
+                            ) : <span style={{ color: C.textMuted }}>—</span>}
                           </td>
                           <td className="px-4 py-2.5">
-                            {a.confirmationStatus === 'PENDING' && (
-                              <button onClick={() => validateAttendance(a.id)} className="px-2 py-1 rounded text-[10px] font-bold text-white" style={{ background: '#10B981' }}>Validasi</button>
-                            )}
+                            <button onClick={() => openOverride(a)}
+                              className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold border hover:bg-gray-50"
+                              style={{ borderColor: C.border, color: C.primary }}>
+                              <Edit3 size={9} /> Ubah
+                            </button>
                           </td>
                         </tr>
                       );

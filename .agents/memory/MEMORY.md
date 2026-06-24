@@ -1,2 +1,3 @@
 - [OSDAI cPanel deployment](cpanel-deployment.md) — key fixes needed for cPanel/Passenger hosting at osdai.smkn1wonogiri.sch.id
 - [GPS Geofence system](gps-geofence.md) — DB-driven geofence config with auto-seed, full API, and admin UI module
+- [Absensi audit P1-P3 fixes](absensi-audit.md) — all 11 external audit items implemented; Student has single `parent` (not `parents`); LATE_THRESHOLD_SECONDS from SystemConfig

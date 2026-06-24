@@ -1,0 +1,154 @@
+4
+
+P1 — kritis
+
+4
+
+P2 — penting
+
+3
+
+P3 — penguatan
+
+~14
+
+hari estimasi
+
+1
+Fase 1 — data integrity (hari 1–4)
+
+Sistem tidak bisa dipercaya selama dua model absensi tidak tersinkron
+
+Bridge sinkronisasi StudentAttendance → Attendance
+
+RiskScore dan dashboard orang tua pakai model legacy yang kosong. Siswa bisa alfa setiap hari, riskScore tetap 0. Ini bug data paling berbahaya di seluruh sistem.
+
+P1
+2 hari
+Dampak
+Effort
+src/services/intelligence.ts
+src/services/parent.ts
+server.ts
+Implementasi: di closeSignal() — setelah ALFA di-create, loop StudentAttendance dan mirror ke Attendance dengan mapping HADIR→PRESENT, ALFA→ABSENT, TERLAMBAT→LATE. Jalankan dalam transaksi yang sama. Lalu update getChildAttendance() agar baca dari StudentAttendance.
+Tambah status IZIN dan SAKIT ke StudentAttendance
+
+Tidak ada cara guru menginput keterangan sakit/izin di sistem real-time. Kalau siswa sakit, tidak ada record apapun di StudentAttendance — dihitung alfa oleh sistem.
+
+P1
+1 hari
+Dampak
+Effort
+prisma/schema.prisma
+server.ts
+enterprise/GuruPresensiKelas.tsx
+Implementasi: ubah attendanceStatus dari plain String ke enum baru di schema — tambah IZIN dan SAKIT. Buat endpoint PATCH /api/intelligence/attendance/:id/status (GURU only) untuk override status + isi field note. Tambah tombol di tabel siswa GuruPresensiKelas. Tidak perlu migrasi data lama.
+Perbaiki kalkulasi TERLAMBAT — referensi ke jadwal resmi
+
+Sekarang TERLAMBAT = 600 detik dari guru buka sesi. Jika guru terlambat buka, siswa yang datang tepat waktu dianggap terlambat. Data tidak valid untuk raport dan laporan dinas.
+
+P1
+1 hari
+Dampak
+Effort
+src/services/intelligence.ts
+prisma/schema.prisma
+Implementasi: saat activateSignal(), simpan officialStartTime dari TimetableConfig (jam pelajaran ke-N × durasi + startAt). Di respondToSignal(), hitung latency dari officialStartTime, bukan dari session.startTime. Tambah field officialStartTime DateTime? ke ClassSession.
+Fix riskScore — pindah sumber data ke StudentAttendance
+
+Setelah bridge (#1) selesai, riskScore masih pakai query dari Attendance dengan filter PRESENT. Harus diupdate agar hitung dari StudentAttendance yang akurat dan real-time.
+
+P1
+4 jam
+Dampak
+Effort
+server.ts:790
+Implementasi: di /api/analytics/risk-students, ganti query s.attendance.filter(PRESENT) menjadi query ke StudentAttendance grouped by studentId. Hitung hadirCount dari HADIR+TERLAMBAT, totalCount dari semua status. Sertakan bobot TERLAMBAT (misal 0.5×) agar tidak disamakan dengan HADIR penuh.
+2
+Fase 2 — kelengkapan fitur (hari 5–9)
+
+Fitur yang sudah ada di schema tapi tidak berfungsi, dan UX guru yang belum lengkap
+
+Notifikasi orang tua otomatis saat siswa ALFA
+
+SMTP dan Notification model sudah ada tapi tidak pernah dipanggil saat closeSignal(). Orang tua tidak tahu anaknya alfa hari ini — tujuan utama sistem absensi digital tidak terpenuhi.
+
+P2
+1 hari
+Dampak
+Effort
+src/services/intelligence.ts
+src/services/emailService.ts
+Implementasi: di closeSignal(), setelah bulk-create ALFA, ambil parent email dari relasi Student→Parent→User. Panggil sendEmail() per siswa alfa (fire-and-forget, jangan blokir response). Insert Notification record untuk orang tua di dashboard. Batasi rate: 1 email per siswa per hari.
+Implementasi ClassroomEngagement — minimal viable
+
+Model ada di schema, relasi lengkap, tapi tidak satu baris kode yang write ke sana. MobileGuruPresensi sudah tampilkan engagement level tapi datanya kosong — selalu tampil default.
+
+P2
+2 hari
+Dampak
+Effort
+src/services/intelligence.ts
+server.ts
+MVP: hitung dari data yang sudah ada. responseActivity = 1 jika hadir. engagementLevel = (responseActivity × 0.4) + (quizParticipation × 0.3) + (taskParticipation × 0.3). Buat/update record di closeSignal() dan juga saat siswa respond. Endpoint baru: GET /api/intelligence/session/:id/engagement.
+Guru input absensi manual (tanpa sesi aktif)
+
+Tidak ada cara guru input absensi untuk hari kemarin, atau koreksi rekap minggu lalu. Guru yang lupa buka sesi = data hilang permanen. Ini kebutuhan operasional dasar.
+
+P2
+1 hari
+Dampak
+Effort
+server.ts
+enterprise/GuruRekap.tsx
+Implementasi: endpoint POST /api/intelligence/attendance/manual (GURU only) — buat ClassSession dengan status CLOSED langsung, isi StudentAttendance per siswa dengan status yang dipilih guru. Tambahkan tab "Input Manual" di GuruRekap. Audit log wajib: MANUAL_INPUT dengan reason.
+Rekap absensi siswa per semester — untuk raport
+
+GuruRekap hanya tampilkan per sesi (hari ini). Tidak ada agregasi per siswa per semester. Guru tidak bisa tahu total alfa/terlambat seorang siswa untuk diisi di raport.
+
+P2
+1 hari
+Dampak
+Effort
+server.ts
+enterprise/GuruRekap.tsx
+Implementasi: endpoint GET /api/intelligence/rekap/kelas/:classId — group StudentAttendance by studentId, count per status, hitung persentase, filter by date range. Response: array siswa + {hadir, terlambat, izin, sakit, alfa, total, persen}. Tambah view "Per Siswa" di GuruRekap dengan export ke PDF/Excel.
+3
+Fase 3 — penguatan & intelligence (hari 10–14)
+
+Fitur AI dan analytics yang membuat sistem benar-benar "smart"
+
+TeacherClassAnalytics — generate setelah sesi ditutup
+
+Model lengkap di schema tapi tidak pernah diisi. aiTeachingScore, attendanceRate, punctualityRate — semua kosong. Kepala sekolah tidak bisa monitor kinerja guru secara data-driven.
+
+P3
+1 hari
+Dampak
+Effort
+src/services/intelligence.ts
+Implementasi: di akhir closeSignal(), hitung dan insert TeacherClassAnalytics: attendanceRate dari hadir/total, punctualityRate dari hadir/(hadir+terlambat), classStabilityScore dari 1-(alfa/total). aiTeachingScore = rata-rata ketiganya × 100. Fire-and-forget.
+Dashboard orang tua — tampilkan StudentAttendance real-time
+
+Setelah bridge selesai di fase 1, perlu halaman baru yang tampilkan StudentAttendance langsung (bukan legacy) — dengan detail per sesi, mapel, guru, dan status konfirmasi.
+
+P3
+1 hari
+Dampak
+Effort
+src/services/parent.ts
+server.ts
+Threshold TERLAMBAT — configurable per sekolah
+
+600 detik hardcoded di intelligence.ts. SMKN berbeda-beda toleransi keterlambatan. Perlu masuk ke SystemConfig atau TimetableConfig agar bisa diubah admin tanpa deploy ulang.
+
+P3
+4 jam
+Dampak
+Effort
+src/services/intelligence.ts
+prisma/schema.prisma
+Implementasi: baca dari SystemConfig dengan key LATE_THRESHOLD_SECONDS, fallback 600. Admin bisa ubah via settings UI.
+Mulai Fase 1 — bridge sinkronisasi ↗
+Tambah IZIN & SAKIT ↗
+Notifikasi orang tua ↗

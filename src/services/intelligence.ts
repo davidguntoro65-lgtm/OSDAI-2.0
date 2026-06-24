@@ -2,6 +2,28 @@ import { prisma } from '../lib/prisma';
 import { GpsService } from './gps';
 import { GoogleGenAI } from "@google/genai";
 import { randomBytes } from 'crypto';
+import { sendAlfaNotificationEmail } from './emailService';
+
+// Cache LATE_THRESHOLD so we don't query DB on every attendance response
+let _lateThresholdCache: number | null = null;
+async function getLateThresholdSeconds(): Promise<number> {
+  if (_lateThresholdCache !== null) return _lateThresholdCache;
+  try {
+    const cfg = await prisma.systemConfig.findUnique({ where: { key: 'LATE_THRESHOLD_SECONDS' } });
+    _lateThresholdCache = cfg ? parseInt(cfg.value) || 600 : 600;
+  } catch { _lateThresholdCache = 600; }
+  return _lateThresholdCache;
+}
+
+// Mapping StudentAttendance status → legacy Attendance status
+const STATUS_MAP: Record<string, string> = {
+  HADIR: 'PRESENT',
+  TERLAMBAT: 'LATE',
+  ALFA: 'ABSENT',
+  INVALID: 'ABSENT',
+  IZIN: 'PERMISSION',
+  SAKIT: 'SICK',
+};
 
 // On Replit: AI_INTEGRATIONS_GEMINI_* are auto-provisioned.
 // On cPanel: falls back to GEMINI_API_KEY from .env.
@@ -42,11 +64,21 @@ export const IntelligenceService = {
       throw new Error('Kelas ini sudah memiliki sesi aktif. Tutup sesi sebelumnya terlebih dahulu.');
     }
 
-    // 4. Validate timetable if scheduleId provided
+    // 4. Validate timetable if scheduleId provided + compute officialStartTime
+    let officialStartTime: Date | null = null;
     if (scheduleId) {
       const schedule = await prisma.schedule.findUnique({ where: { id: scheduleId } });
       if (!schedule || schedule.teacherId !== teacherId || schedule.classId !== classId) {
         throw new Error('Jadwal tidak valid untuk guru dan kelas ini.');
+      }
+      // Compute officialStartTime from TimetableConfig and schedule.periodStart
+      const config = await prisma.timetableConfig.findFirst();
+      if (config && schedule.periodStart) {
+        const [h, m] = config.startAt.split(':').map(Number);
+        const startMinutes = h * 60 + m + (schedule.periodStart - 1) * config.periodDuration;
+        const now = new Date();
+        officialStartTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(),
+          Math.floor(startMinutes / 60), startMinutes % 60, 0);
       }
     }
 
@@ -62,7 +94,8 @@ export const IntelligenceService = {
           subjectId,
           scheduleId,
           sessionToken,
-          signalStatus: 'ACTIVE'
+          signalStatus: 'ACTIVE',
+          ...(officialStartTime ? { officialStartTime } : {}),
         },
         include: {
           class: true,
@@ -149,8 +182,125 @@ export const IntelligenceService = {
         }
       });
 
+      // 4. Fetch all StudentAttendances for this session (including newly created ALFA)
+      const allAttendances = await tx.studentAttendance.findMany({
+        where: { sessionId },
+        include: { student: { include: { user: true } } }
+      });
+
+      // 5. P1 BRIDGE SYNC: Mirror StudentAttendance → legacy Attendance model
+      //    Only possible if session has a scheduleId (links to legacy Schedule)
+      if (session.scheduleId) {
+        for (const att of allAttendances) {
+          const legacyStatus = STATUS_MAP[att.attendanceStatus] ?? 'ABSENT';
+          const existing = await tx.attendance.findFirst({
+            where: { studentId: att.studentId, scheduleId: session.scheduleId! }
+          });
+          if (existing) {
+            await tx.attendance.update({
+              where: { id: existing.id },
+              data: { status: legacyStatus as any, note: att.note ?? undefined }
+            });
+          } else {
+            await tx.attendance.create({
+              data: { studentId: att.studentId, scheduleId: session.scheduleId!, status: legacyStatus as any, note: att.note ?? undefined }
+            });
+          }
+        }
+      }
+
+      // 6. P3 CLASSROOM ENGAGEMENT: calculate and upsert per student from attendance data
+      for (const att of allAttendances) {
+        const responseActivity = att.attendanceStatus === 'HADIR' ? 1 : att.attendanceStatus === 'TERLAMBAT' ? 0.5 : 0;
+        const engagementLevel = parseFloat((responseActivity * 0.4).toFixed(4));
+        const existing = await tx.classroomEngagement.findFirst({ where: { sessionId, studentId: att.studentId } });
+        if (existing) {
+          await tx.classroomEngagement.update({
+            where: { id: existing.id },
+            data: { responseActivity, engagementLevel }
+          });
+        } else {
+          await tx.classroomEngagement.create({
+            data: { sessionId, studentId: att.studentId, responseActivity, engagementLevel }
+          });
+        }
+      }
+
+      // 7. P3 TEACHER CLASS ANALYTICS: auto-generate per session
+      const total = allAttendances.length;
+      if (total > 0) {
+        const hadirCount = allAttendances.filter(a => a.attendanceStatus === 'HADIR').length;
+        const terlambatCount = allAttendances.filter(a => a.attendanceStatus === 'TERLAMBAT').length;
+        const alfaCount = allAttendances.filter(a => a.attendanceStatus === 'ALFA').length;
+        const attendanceRate = ((hadirCount + terlambatCount) / total) * 100;
+        const punctualityRate = (hadirCount + terlambatCount) > 0 ? (hadirCount / (hadirCount + terlambatCount)) * 100 : 0;
+        const classStabilityScore = 1 - (alfaCount / total);
+        const engagementRate = attendanceRate / 100;
+        const aiTeachingScore = (attendanceRate / 100 * 0.4 + punctualityRate / 100 * 0.3 + classStabilityScore * 0.3) * 100;
+        await tx.teacherClassAnalytics.create({
+          data: {
+            teacherId: session.teacherId,
+            sessionId,
+            attendanceRate,
+            engagementRate,
+            punctualityRate,
+            classStabilityScore,
+            aiTeachingScore,
+          }
+        });
+      }
+
+      // 8. P2 PARENT NOTIFICATIONS (in-app): create Notification for each ALFA student's parents
+      const alfaStudentData = allAttendances.filter(a => a.attendanceStatus === 'ALFA');
+      if (alfaStudentData.length > 0) {
+        const alfaIds = alfaStudentData.map(a => a.studentId);
+        const studentsWithParent = await tx.student.findMany({
+          where: { id: { in: alfaIds } },
+          include: { user: true, parent: { include: { user: true } } }
+        });
+        for (const student of studentsWithParent) {
+          if (student.parent) {
+            await tx.notification.create({
+              data: {
+                receiverId: student.parent.userId,
+                title: `Ketidakhadiran: ${student.user.name}`,
+                message: `${student.user.name} tidak hadir (ALFA) pada ${session.subject.name} — ${session.class.name} hari ini. Hubungi wali kelas untuk keterangan.`,
+                type: 'ACADEMIC',
+              }
+            });
+          }
+        }
+        // Store for fire-and-forget email after transaction
+        (updated as any).__alfaEmailQueue = studentsWithParent.map(s => ({
+          student: s,
+          subject: session.subject.name,
+          className: session.class.name,
+          teacherName: session.teacher.user.name,
+        }));
+      }
+
       return updated;
     });
+
+    // P2: Fire-and-forget emails AFTER transaction completes (never block the response)
+    const emailQueue = (closed as any).__alfaEmailQueue as Array<any> | undefined;
+    if (emailQueue?.length) {
+      setImmediate(async () => {
+        for (const item of emailQueue) {
+          const parent = item.student.parent;
+          if (parent?.user?.email) {
+            await sendAlfaNotificationEmail({
+              to: parent.user.email,
+              parentName: parent.user.name,
+              studentName: item.student.user.name,
+              subjectName: item.subject,
+              className: item.className,
+              teacherName: item.teacherName,
+            }).catch(() => {});
+          }
+        }
+      });
+    }
 
     return closed;
   },
@@ -208,17 +358,24 @@ export const IntelligenceService = {
     await GpsService.logLocation(studentId, {
       lat: data.lat,
       lng: data.lng,
-      accuracy: typeof data.accuracy === 'number' ? data.accuracy : 0,
+      accuracy: typeof (data as any).accuracy === 'number' ? (data as any).accuracy : 0,
       isMock: geoValidation.distance === 0 && !geoValidation.isInside ? true : false,
       deviceInfo: data.deviceId
     });
 
-    // 6. Calculate Latency/Punctuality
+    // 6. P1 FIX: Calculate Latency from officialStartTime (not session.startTime)
+    //    → Prevents "guru terlambat buka" menyebabkan semua siswa dihitung TERLAMBAT
     const now = new Date();
-    const latencySeconds = Math.floor((now.getTime() - new Date(session.startTime).getTime()) / 1000);
+    const referenceTime = (session as any).officialStartTime
+      ? new Date((session as any).officialStartTime)
+      : new Date(session.startTime);
+    const latencySeconds = Math.max(0, Math.floor((now.getTime() - referenceTime.getTime()) / 1000));
+
+    // P3: Read LATE_THRESHOLD from SystemConfig (configurable per sekolah)
+    const lateThreshold = await getLateThresholdSeconds();
 
     let status = 'HADIR';
-    if (latencySeconds > 600) status = 'TERLAMBAT';
+    if (latencySeconds > lateThreshold) status = 'TERLAMBAT';
     if (!geoValidation.isInside) status = 'INVALID';
 
     // 7. Create attendance in transaction with audit log

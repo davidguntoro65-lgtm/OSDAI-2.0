@@ -1889,6 +1889,204 @@ async function startServer() {
     } catch (error: any) { res.status(500).json({ error: error.message }); }
   });
 
+  // PATCH — guru override status (IZIN/SAKIT/HADIR/dll) + catatan keterangan
+  app.patch('/api/intelligence/attendance/:id/status', authenticate, authorize([Role.GURU, Role.SUPER_ADMIN]), async (req: AuthRequest, res) => {
+    try {
+      const { status, note } = req.body;
+      const VALID_STATUSES = ['HADIR', 'TERLAMBAT', 'ALFA', 'IZIN', 'SAKIT', 'INVALID'];
+      if (!status || !VALID_STATUSES.includes(status)) {
+        return res.status(400).json({ error: `Status tidak valid. Pilih: ${VALID_STATUSES.join(', ')}` });
+      }
+
+      // Ownership check — non-SUPER_ADMIN hanya bisa edit sesi miliknya sendiri
+      const record = await prisma.studentAttendance.findUnique({
+        where: { id: req.params.id },
+        include: { session: true },
+      });
+      if (!record) return res.status(404).json({ error: 'Catatan absensi tidak ditemukan.' });
+      if (req.user!.role !== Role.SUPER_ADMIN) {
+        const teacher = await prisma.teacher.findUnique({ where: { userId: req.user!.userId } });
+        if (!teacher || record.session.teacherId !== teacher.id) {
+          return res.status(403).json({ error: 'Anda tidak berhak mengubah absensi dari sesi ini.' });
+        }
+      }
+
+      const updated = await prisma.studentAttendance.update({
+        where: { id: req.params.id },
+        data: {
+          attendanceStatus: status,
+          note: note ?? null,
+          confirmationStatus: 'CONFIRMED',
+        },
+        include: { student: { include: { user: true } } },
+      });
+
+      // Audit log
+      await prisma.auditLog.create({
+        data: {
+          userId: req.user!.userId,
+          action: 'STATUS_OVERRIDE',
+          entity: 'StudentAttendance',
+          entityId: updated.id,
+          newValue: JSON.stringify({ status, note }),
+        }
+      });
+
+      // Broadcast ke session room
+      io.to(`session-${updated.sessionId}`).emit('attendance-update', updated);
+      res.json(updated);
+    } catch (error: any) { res.status(400).json({ error: error.message }); }
+  });
+
+  // POST — guru input absensi manual (tanpa sesi aktif: buat ClassSession CLOSED langsung)
+  app.post('/api/intelligence/attendance/manual', authenticate, authorize([Role.GURU, Role.SUPER_ADMIN]), async (req: AuthRequest, res) => {
+    try {
+      const { classId, subjectId, scheduleId, date, attendances, reason } = req.body;
+      // attendances: Array<{ studentId: string; status: string; note?: string }>
+      if (!classId || !subjectId || !Array.isArray(attendances) || attendances.length === 0) {
+        return res.status(400).json({ error: 'classId, subjectId, dan attendances wajib diisi.' });
+      }
+
+      let teacherId: string;
+      if (req.user!.role === Role.SUPER_ADMIN && req.body.teacherId) {
+        teacherId = req.body.teacherId;
+      } else {
+        const teacher = await prisma.teacher.findUnique({ where: { userId: req.user!.userId } });
+        if (!teacher) return res.status(404).json({ error: 'Profil guru tidak ditemukan.' });
+        teacherId = teacher.id;
+      }
+
+      const sessionDate = date ? new Date(date) : new Date();
+      const sessionToken = 'MAN-' + Math.random().toString(36).slice(2, 6).toUpperCase();
+
+      const result = await prisma.$transaction(async (tx) => {
+        const session = await tx.classSession.create({
+          data: {
+            teacherId,
+            classId,
+            subjectId,
+            scheduleId: scheduleId ?? null,
+            sessionToken,
+            signalStatus: 'CLOSED',
+            startTime: sessionDate,
+            endTime: sessionDate,
+          }
+        });
+
+        const records = await tx.studentAttendance.createMany({
+          data: attendances.map((a: any) => ({
+            studentId: a.studentId,
+            sessionId: session.id,
+            attendanceStatus: a.status ?? 'ALFA',
+            note: a.note ?? (reason ?? 'Input manual guru'),
+            confirmationStatus: 'CONFIRMED',
+            gpsValidated: false,
+            integrityScore: 0.5,
+          })),
+          skipDuplicates: true,
+        });
+
+        await tx.auditLog.create({
+          data: {
+            userId: req.user!.userId,
+            action: 'MANUAL_INPUT',
+            entity: 'ClassSession',
+            entityId: session.id,
+            newValue: JSON.stringify({ reason, attendanceCount: records.count, classId, subjectId }),
+          }
+        });
+
+        // Bridge sync if scheduleId provided
+        if (scheduleId) {
+          for (const a of attendances) {
+            const STATUS_MAP: Record<string, string> = { HADIR: 'PRESENT', TERLAMBAT: 'LATE', ALFA: 'ABSENT', IZIN: 'PERMISSION', SAKIT: 'SICK', INVALID: 'ABSENT' };
+            const legacyStatus = STATUS_MAP[a.status] ?? 'ABSENT';
+            const existing = await tx.attendance.findFirst({ where: { studentId: a.studentId, scheduleId } });
+            if (existing) {
+              await tx.attendance.update({ where: { id: existing.id }, data: { status: legacyStatus as any, note: a.note ?? reason } });
+            } else {
+              await tx.attendance.create({ data: { studentId: a.studentId, scheduleId, status: legacyStatus as any, note: a.note ?? reason } });
+            }
+          }
+        }
+
+        return { session, count: records.count };
+      });
+
+      res.status(201).json({ success: true, sessionId: result.session.id, created: result.count });
+    } catch (error: any) { res.status(400).json({ error: error.message }); }
+  });
+
+  // GET — rekap absensi per siswa per kelas (untuk raport & laporan semester)
+  app.get('/api/intelligence/rekap/kelas/:classId', authenticate, authorize([Role.GURU, Role.SUPER_ADMIN, Role.KEPALA_SEKOLAH, Role.BK]), async (req: AuthRequest, res) => {
+    try {
+      const { classId } = req.params;
+      const { from, to, subjectId } = req.query;
+
+      const dateFilter: any = {};
+      if (from) dateFilter.gte = new Date(from as string);
+      if (to)   dateFilter.lte = new Date(to as string);
+
+      // Get all students in the class
+      const students = await prisma.student.findMany({
+        where: { classId, status: 'ACTIVE' },
+        include: { user: { select: { name: true } } },
+        orderBy: { user: { name: 'asc' } }
+      });
+
+      // Get all StudentAttendances for the class in the period
+      const sessionFilter: any = { classId, signalStatus: 'CLOSED' };
+      if (subjectId) sessionFilter.subjectId = subjectId as string;
+      if (Object.keys(dateFilter).length > 0) sessionFilter.startTime = dateFilter;
+
+      const sessions = await prisma.classSession.findMany({
+        where: sessionFilter,
+        select: { id: true, startTime: true, subjectId: true, subject: { select: { name: true } } }
+      });
+
+      const sessionIds = sessions.map(s => s.id);
+      const allAttendances = await prisma.studentAttendance.findMany({
+        where: { sessionId: { in: sessionIds } },
+        select: { studentId: true, attendanceStatus: true, sessionId: true }
+      });
+
+      // Group by studentId
+      const result = students.map(student => {
+        const studentAtts = allAttendances.filter(a => a.studentId === student.id);
+        const total = studentAtts.length;
+        const hadir   = studentAtts.filter(a => a.attendanceStatus === 'HADIR').length;
+        const terlambat = studentAtts.filter(a => a.attendanceStatus === 'TERLAMBAT').length;
+        const izin    = studentAtts.filter(a => a.attendanceStatus === 'IZIN').length;
+        const sakit   = studentAtts.filter(a => a.attendanceStatus === 'SAKIT').length;
+        const alfa    = studentAtts.filter(a => a.attendanceStatus === 'ALFA').length;
+        const invalid = studentAtts.filter(a => a.attendanceStatus === 'INVALID').length;
+        const presentTotal = hadir + terlambat;
+        const persen  = total > 0 ? Math.round((presentTotal / total) * 100) : 0;
+
+        return {
+          studentId: student.id,
+          name: student.user.name,
+          total,
+          hadir,
+          terlambat,
+          izin,
+          sakit,
+          alfa,
+          invalid,
+          presentTotal,
+          persen,
+        };
+      });
+
+      res.json({
+        classId,
+        totalSessions: sessions.length,
+        period: { from: from ?? null, to: to ?? null },
+        students: result,
+      });
+    } catch (error: any) { res.status(500).json({ error: error.message }); }
+  });
+
   // ─── ClassroomEngagement Endpoints ──────────────────────────────────────────
   // GET all engagement records for a session
   app.get('/api/intelligence/session/:sessionId/engagement', authenticate, authorize([Role.GURU, Role.SUPER_ADMIN]), async (req, res) => {
