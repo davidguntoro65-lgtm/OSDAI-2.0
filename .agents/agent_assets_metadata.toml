@@ -6,3 +6,9 @@ id = "j__zkMjCKXzmRU6ZJ6Vf_"
 uri = "file://docs/LAPORAN_MODEL_ABSENSI_KELAS.md"
 type = "text"
 title = "Laporan Detail Model Absensi Kelas — OSDAI v2.0"
+
+[[outputs]]
+id = "W2OH6qLUsWtdqCHAey7-p"
+uri = "file://docs/AUDIT_ABSENSI_SKOR_MODUL.md"
+type = "text"
+title = "Audit Absensi OSDAI — Skor Per Modul + 14 Perbaikan"

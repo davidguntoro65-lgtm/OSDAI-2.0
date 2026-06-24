@@ -28,21 +28,73 @@ export const ParentService = {
     },
 
     /**
-     * Get detailed attendance for a specific child
+     * Get detailed attendance for a specific child — returns BOTH
+     * real-time StudentAttendance (session-based) and legacy Attendance (schedule-based)
+     * so parents see a complete picture regardless of which system the school uses.
      */
     async getChildAttendance(studentId: string) {
-        return await prisma.attendance.findMany({
-            where: { studentId },
-            include: {
-                schedule: {
-                    include: {
-                        subject: true,
-                        teacher: { include: { user: true } }
+        const [realtime, legacy] = await Promise.all([
+            prisma.studentAttendance.findMany({
+                where: { studentId },
+                include: {
+                    session: {
+                        include: {
+                            subject: true,
+                            class: true,
+                            teacher: { include: { user: { select: { name: true } } } }
+                        }
                     }
-                }
-            },
-            orderBy: { timestamp: 'desc' }
-        });
+                },
+                orderBy: { timestamp: 'desc' },
+                take: 100
+            }),
+            prisma.attendance.findMany({
+                where: { studentId },
+                include: {
+                    schedule: {
+                        include: {
+                            subject: true,
+                            teacher: { include: { user: true } }
+                        }
+                    }
+                },
+                orderBy: { timestamp: 'desc' },
+                take: 100
+            })
+        ]);
+
+        // Normalise both datasets into a unified shape for the frontend
+        const realtimeNorm = realtime.map(r => ({
+            id: r.id,
+            source: 'REALTIME' as const,
+            timestamp: r.timestamp,
+            status: r.attendanceStatus,
+            subjectName: r.session.subject.name,
+            className: r.session.class.name,
+            teacherName: r.session.teacher.user.name,
+            gpsValidated: r.gpsValidated,
+            integrityScore: r.integrityScore
+        }));
+
+        const legacyNorm = legacy.map(l => ({
+            id: l.id,
+            source: 'LEGACY' as const,
+            timestamp: l.timestamp,
+            status: l.status,
+            subjectName: l.schedule?.subject?.name ?? '-',
+            className: '-',
+            teacherName: l.schedule?.teacher?.user?.name ?? '-',
+            gpsValidated: null,
+            integrityScore: null
+        }));
+
+        return {
+            realtime: realtimeNorm,
+            legacy: legacyNorm,
+            combined: [...realtimeNorm, ...legacyNorm].sort(
+                (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+            )
+        };
     },
 
     /**
@@ -62,7 +114,7 @@ export const ParentService = {
                     }
                 }
             },
-            orderBy: { studentId: 'asc' } // Placeholder for better grouping
+            orderBy: { studentId: 'asc' }
         });
     },
 

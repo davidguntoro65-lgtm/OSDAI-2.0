@@ -121,6 +121,7 @@ export default function StudentAttendancePanel({ authToken }: { authToken: strin
               sessionToken: sessionToken.toUpperCase(),
               lat: pos.coords.latitude,
               lng: pos.coords.longitude,
+              accuracy: pos.coords.accuracy,
               deviceId
             })
           });

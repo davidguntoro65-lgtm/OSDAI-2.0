@@ -789,38 +789,55 @@ async function startServer() {
   // AI Analytics Endpoints
   app.get('/api/analytics/risk-students', authenticate, authorize([Role.SUPER_ADMIN, Role.BK, Role.KEPALA_SEKOLAH]), async (req, res) => {
     try {
-      // Risk scoring logic: low attendance (< 75%) or missing grades
+      // Risk scoring: uses BOTH real-time StudentAttendance (primary) and legacy Attendance (fallback)
       const students = await prisma.student.findMany({
         include: {
           user: true,
           class: true,
           attendance: true,
+          studentAttendances: true,
           grades: true
         }
       });
 
       const riskStudents = students.map(s => {
-        const attendanceCount = s.attendance.length;
-        const presentCount = s.attendance.filter(a => a.status === 'PRESENT').length;
-        const attendanceRate = attendanceCount > 0 ? (presentCount / attendanceCount) * 100 : 100;
-        
-        const avgGrade = s.grades.length > 0 
-          ? s.grades.reduce((acc, curr) => acc + Number(curr.value), 0) / s.grades.length 
+        // Prefer real-time studentAttendances; fall back to legacy attendance
+        let attendanceRate = 100;
+        if (s.studentAttendances.length > 0) {
+          const hadirCount = s.studentAttendances.filter(
+            a => a.attendanceStatus === 'HADIR' || a.attendanceStatus === 'TERLAMBAT'
+          ).length;
+          attendanceRate = (hadirCount / s.studentAttendances.length) * 100;
+        } else if (s.attendance.length > 0) {
+          const presentCount = s.attendance.filter(a => a.status === 'PRESENT').length;
+          attendanceRate = (presentCount / s.attendance.length) * 100;
+        }
+
+        const alfaCount = s.studentAttendances.filter(a => a.attendanceStatus === 'ALFA').length;
+        const invalidCount = s.studentAttendances.filter(a => a.attendanceStatus === 'INVALID').length;
+
+        const avgGrade = s.grades.length > 0
+          ? s.grades.reduce((acc, curr) => acc + Number(curr.value), 0) / s.grades.length
           : 0;
 
         let riskScore = 0;
         if (attendanceRate < 75) riskScore += 40;
         if (attendanceRate < 50) riskScore += 30;
-        if (avgGrade < 60) riskScore += 30;
+        if (alfaCount >= 5)      riskScore += 15;
+        if (invalidCount >= 3)   riskScore += 15;
+        if (avgGrade < 60)       riskScore += 30;
 
         return {
           id: s.id,
           name: s.user.name,
           class: s.class?.name,
-          attendanceRate,
-          avgGrade,
-          riskScore,
-          status: riskScore > 60 ? 'HIGH RISK' : riskScore > 30 ? 'MEDIUM RISK' : 'LOW RISK'
+          attendanceRate: Math.round(attendanceRate * 10) / 10,
+          avgGrade: Math.round(avgGrade * 10) / 10,
+          alfaCount,
+          invalidCount,
+          riskScore: Math.min(100, riskScore),
+          status: riskScore > 60 ? 'HIGH RISK' : riskScore > 30 ? 'MEDIUM RISK' : 'LOW RISK',
+          attendanceSource: s.studentAttendances.length > 0 ? 'REALTIME' : 'LEGACY'
         };
       }).filter(s => s.riskScore > 30).sort((a, b) => b.riskScore - a.riskScore);
 
@@ -842,21 +859,35 @@ async function startServer() {
         })
       ]);
 
-      // Daily attendance summary
+      // Daily attendance — uses BOTH real-time StudentAttendance (primary) + legacy groupBy (secondary)
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      const attendanceSummary = await prisma.attendance.groupBy({
-        by: ['status'],
-        where: { timestamp: { gte: today } },
-        _count: true
-      });
+      const [realtimeSummary, legacySummary] = await Promise.all([
+        prisma.studentAttendance.groupBy({
+          by: ['attendanceStatus'],
+          where: { timestamp: { gte: today } },
+          _count: true
+        }),
+        prisma.attendance.groupBy({
+          by: ['status'],
+          where: { timestamp: { gte: today } },
+          _count: true
+        })
+      ]);
+
+      // Prefer real-time data; fall back to legacy if school hasn't used sessions today
+      const useRealtime = realtimeSummary.length > 0;
+      const attendanceSummary = useRealtime
+        ? realtimeSummary.map(r => ({ status: r.attendanceStatus, _count: r._count }))
+        : legacySummary;
 
       res.json({
         studentCount,
         teacherCount,
         activeClasses,
         revenue: totalRevenue._sum.amount || 0,
-        attendance: attendanceSummary
+        attendance: attendanceSummary,
+        attendanceSource: useRealtime ? 'REALTIME' : 'LEGACY'
       });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -1333,8 +1364,14 @@ async function startServer() {
   // ACTIVATE signal — teacher identity always from JWT, never from body
   app.post('/api/intelligence/signal/activate', authenticate, authorize([Role.SUPER_ADMIN, Role.GURU]), async (req: AuthRequest, res) => {
     try {
-      const teacher = await prisma.teacher.findUnique({ where: { userId: req.user!.userId } });
-      if (!teacher) return res.status(404).json({ error: 'Profil guru tidak ditemukan.' });
+      // SUPER_ADMIN can pass teacherId explicitly; regular GURU resolved from JWT
+      let teacher;
+      if (req.user!.role === Role.SUPER_ADMIN && req.body.teacherId) {
+        teacher = await prisma.teacher.findUnique({ where: { id: req.body.teacherId } });
+      } else {
+        teacher = await prisma.teacher.findUnique({ where: { userId: req.user!.userId } });
+      }
+      if (!teacher) return res.status(404).json({ error: 'Profil guru tidak ditemukan. SUPER_ADMIN harus menyertakan teacherId dalam body request.' });
       const session = await IntelligenceService.activateSignal(
         teacher.id,
         req.body.classId,
@@ -1489,15 +1526,35 @@ async function startServer() {
     }
   });
 
-  // TEACHER validates a PENDING student's attendance (Point 8 — realtime badge update)
+  // TEACHER validates a PENDING student's attendance — only the session owner may validate
   app.post('/api/intelligence/attendance/:id/validate', authenticate, authorize([Role.GURU, Role.SUPER_ADMIN]), async (req: AuthRequest, res) => {
     try {
+      // Fetch the attendance record to verify session ownership
+      const record = await prisma.studentAttendance.findUnique({
+        where: { id: req.params.id },
+        include: { session: true },
+      });
+      if (!record) return res.status(404).json({ error: 'Catatan absensi tidak ditemukan.' });
+
+      // Non-admin: verify this teacher owns the session
+      if (req.user!.role !== Role.SUPER_ADMIN) {
+        const teacher = await prisma.teacher.findUnique({ where: { userId: req.user!.userId } });
+        if (!teacher || record.session.teacherId !== teacher.id) {
+          return res.status(403).json({ error: 'Anda tidak berhak memvalidasi absensi dari sesi ini.' });
+        }
+      }
+
+      // Compute a dynamic integrity score: base 0.6, +0.2 if GPS valid, +0.2 if not late
+      const gpsBonus    = record.gpsValidated ? 0.2 : 0;
+      const punctuality = record.responseLatency !== null && record.responseLatency <= 600 ? 0.2 : 0;
+      const newScore    = Math.min(1.0, 0.6 + gpsBonus + punctuality);
+
       const updated = await prisma.studentAttendance.update({
         where: { id: req.params.id },
         data: {
           confirmationStatus: 'CONFIRMED',
           attendanceStatus: 'HADIR',
-          integrityScore: 0.7,
+          integrityScore: newScore,
         },
         include: { student: { include: { user: true } } },
       });
@@ -1813,7 +1870,9 @@ async function startServer() {
       const teacher = await prisma.teacher.findUnique({ where: { userId: req.user!.userId } });
       if (!teacher) return res.status(404).json({ error: 'Profil guru tidak ditemukan.' });
       const where: any = { teacherId: teacher.id };
-      if (req.query.courseId) where.courseId = req.query.courseId;
+      // Filter by subjectId (ClassSession has no courseId field — use subjectId instead)
+      if (req.query.subjectId) where.subjectId = req.query.subjectId as string;
+      if (req.query.classId) where.classId = req.query.classId as string;
       const sessions = await prisma.classSession.findMany({
         where,
         include: { class: true, subject: true, attendances: true },
@@ -1827,6 +1886,93 @@ async function startServer() {
         alfa: s.attendances.filter(a => a.attendanceStatus === 'ALFA').length,
       }));
       res.json(result);
+    } catch (error: any) { res.status(500).json({ error: error.message }); }
+  });
+
+  // ─── ClassroomEngagement Endpoints ──────────────────────────────────────────
+  // GET all engagement records for a session
+  app.get('/api/intelligence/session/:sessionId/engagement', authenticate, authorize([Role.GURU, Role.SUPER_ADMIN]), async (req, res) => {
+    try {
+      const engagements = await prisma.classroomEngagement.findMany({
+        where: { sessionId: req.params.sessionId },
+        include: { student: { include: { user: { select: { name: true } } } } },
+        orderBy: { timestamp: 'desc' }
+      });
+      res.json(engagements);
+    } catch (error: any) { res.status(500).json({ error: error.message }); }
+  });
+
+  // POST create/update engagement record for a student in a session
+  app.post('/api/intelligence/session/:sessionId/engagement', authenticate, authorize([Role.GURU, Role.SUPER_ADMIN]), async (req: AuthRequest, res) => {
+    try {
+      const { studentId, engagementScore, participationLevel, focusScore, note } = req.body;
+      if (!studentId) return res.status(400).json({ error: 'studentId wajib diisi.' });
+
+      // Upsert: one record per student per session
+      const existing = await prisma.classroomEngagement.findFirst({
+        where: { sessionId: req.params.sessionId, studentId }
+      });
+
+      const data = {
+        engagementScore: engagementScore ?? null,
+        participationLevel: participationLevel ?? null,
+        focusScore: focusScore ?? null,
+        note: note ?? null,
+      };
+
+      let record;
+      if (existing) {
+        record = await prisma.classroomEngagement.update({ where: { id: existing.id }, data });
+      } else {
+        record = await prisma.classroomEngagement.create({
+          data: { ...data, sessionId: req.params.sessionId, studentId }
+        });
+      }
+      res.json(record);
+    } catch (error: any) { res.status(500).json({ error: error.message }); }
+  });
+
+  // ─── TeacherClassAnalytics Endpoints ─────────────────────────────────────────
+  // GET analytics summary per teacher per class (admin / kepsek)
+  app.get('/api/intelligence/analytics/class', authenticate, authorize([Role.GURU, Role.SUPER_ADMIN, Role.KEPALA_SEKOLAH]), async (req: AuthRequest, res) => {
+    try {
+      const where: any = {};
+      if (req.query.teacherId) where.teacherId = req.query.teacherId as string;
+      if (req.query.classId)   where.classId   = req.query.classId as string;
+
+      // If GURU, restrict to own analytics
+      if (req.user!.role === Role.GURU) {
+        const teacher = await prisma.teacher.findUnique({ where: { userId: req.user!.userId } });
+        if (teacher) where.teacherId = teacher.id;
+      }
+
+      const analytics = await prisma.teacherClassAnalytics.findMany({
+        where,
+        include: {
+          teacher: { include: { user: { select: { name: true } } } },
+          class: { select: { name: true } },
+          subject: { select: { name: true } }
+        },
+        orderBy: { updatedAt: 'desc' },
+        take: 200
+      });
+      res.json(analytics);
+    } catch (error: any) { res.status(500).json({ error: error.message }); }
+  });
+
+  // POST upsert analytics after a session closes (called internally or by admin)
+  app.post('/api/intelligence/analytics/class', authenticate, authorize([Role.SUPER_ADMIN, Role.GURU]), async (req: AuthRequest, res) => {
+    try {
+      const { teacherId, classId, subjectId, period, totalSessions, avgAttendanceRate, avgAlfa, avgTerlambat, trend } = req.body;
+      if (!teacherId || !classId || !subjectId || !period) {
+        return res.status(400).json({ error: 'teacherId, classId, subjectId, period wajib diisi.' });
+      }
+      const record = await prisma.teacherClassAnalytics.upsert({
+        where: { teacherId_classId_subjectId_period: { teacherId, classId, subjectId, period } },
+        update: { totalSessions, avgAttendanceRate, avgAlfa, avgTerlambat, trend, updatedAt: new Date() },
+        create: { teacherId, classId, subjectId, period, totalSessions, avgAttendanceRate, avgAlfa, avgTerlambat, trend }
+      });
+      res.json(record);
     } catch (error: any) { res.status(500).json({ error: error.message }); }
   });
 

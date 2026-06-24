@@ -208,8 +208,8 @@ export const IntelligenceService = {
     await GpsService.logLocation(studentId, {
       lat: data.lat,
       lng: data.lng,
-      accuracy: 0,
-      isMock: false,
+      accuracy: typeof data.accuracy === 'number' ? data.accuracy : 0,
+      isMock: geoValidation.distance === 0 && !geoValidation.isInside ? true : false,
       deviceInfo: data.deviceId
     });
 
