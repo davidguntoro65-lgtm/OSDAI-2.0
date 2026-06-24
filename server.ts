@@ -342,16 +342,6 @@ async function startServer() {
     }
   });
 
-  app.get('/api/students/:id', authenticate, async (req, res) => {
-    try {
-      const student = await StudentService.getById(req.params.id);
-      if (!student) return res.status(404).json({ error: 'Student not found' });
-      res.json(student);
-    } catch (error) {
-      res.status(500).json({ error: 'Failed to fetch student details' });
-    }
-  });
-
   app.post('/api/students', authenticate, authorize([Role.SUPER_ADMIN, Role.TU]), async (req: AuthRequest, res) => {
     try {
       const student = await StudentService.create(req.body);
@@ -773,6 +763,17 @@ async function startServer() {
     } catch (err: any) {
       logger.info('BULK', `Upload error: ${err.message}`);
       return res.status(500).json({ error: 'Gagal memproses file. Pastikan format file sesuai template.' });
+    }
+  });
+
+  // GET /api/students/:id — must be AFTER all named sub-routes
+  app.get('/api/students/:id', authenticate, async (req, res) => {
+    try {
+      const student = await StudentService.getById(req.params.id);
+      if (!student) return res.status(404).json({ error: 'Student not found' });
+      res.json(student);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch student details' });
     }
   });
 
