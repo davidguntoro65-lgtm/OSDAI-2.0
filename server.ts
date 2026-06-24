@@ -361,6 +361,229 @@ async function startServer() {
     }
   });
 
+  // GET /api/students/bulk-template — download Excel import template
+  app.get('/api/students/bulk-template', authenticate, authorize([Role.SUPER_ADMIN, Role.TU]), async (_req, res) => {
+    try {
+      const ExcelJS = await import('exceljs');
+      const wb = new ExcelJS.Workbook();
+      wb.creator = 'OSDAI';
+      const ws = wb.addWorksheet('Import Siswa');
+
+      // Column widths & headers
+      ws.columns = [
+        { header: 'Nama', key: 'nama', width: 30 },
+        { header: 'NIS', key: 'nis', width: 15 },
+        { header: 'Password', key: 'password', width: 20 },
+        { header: 'Kelas', key: 'kelas', width: 12 },
+      ];
+
+      // Style header row
+      const headerRow = ws.getRow(1);
+      headerRow.eachCell(cell => {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1A1A1A' } };
+        cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        cell.border = {
+          bottom: { style: 'thin', color: { argb: 'FFEBEBE8' } },
+        };
+      });
+      headerRow.height = 24;
+
+      // Example rows
+      const examples = [
+        { nama: 'Budi Santoso', nis: '2024001', password: 'Budi2024!', kelas: 'XAKL' },
+        { nama: 'Siti Rahayu', nis: '2024002', password: 'Siti2024!', kelas: 'XIPM' },
+        { nama: 'Andi Pratama', nis: '2024003', password: 'Andi2024!', kelas: 'XIIMPLB' },
+      ];
+      examples.forEach((ex, i) => {
+        const row = ws.addRow(ex);
+        row.eachCell(cell => {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: i % 2 === 0 ? 'FFFAFAF9' : 'FFFFFFFF' } };
+          cell.alignment = { vertical: 'middle' };
+        });
+        row.height = 20;
+      });
+
+      // Info sheet
+      const ws2 = wb.addWorksheet('Panduan');
+      ws2.getColumn(1).width = 60;
+      [
+        ['PANDUAN IMPORT SISWA MASSAL - OSDAI'],
+        [''],
+        ['Kolom yang tersedia:'],
+        ['  Nama     : Nama lengkap siswa (wajib)'],
+        ['  NIS      : Nomor Induk Siswa, harus unik (wajib)'],
+        ['  Password : Password login siswa (wajib, min 6 karakter)'],
+        ['  Kelas    : Kode kelas (wajib, lihat contoh di bawah)'],
+        [''],
+        ['Format kode Kelas:'],
+        ['  X   = Kelas 10  → contoh: XAKL, XPM, XTBS'],
+        ['  XI  = Kelas 11  → contoh: XIAKL, XIPM, XIMPLB'],
+        ['  XII = Kelas 12  → contoh: XIIAKL, XIIPM, XIIMPLB'],
+        [''],
+        ['Kode Jurusan yang tersedia:'],
+        ['  AKL   = Akuntansi dan Keuangan Lembaga'],
+        ['  MPLB  = Manajemen Perkantoran dan Layanan Bisnis'],
+        ['  PM    = Pemasaran'],
+        ['  TB    = Tata Busana'],
+        ['  TBS   = Tata Boga dan Sanitasi'],
+        [''],
+        ['Catatan:'],
+        ['  - Email & NISN dibuat otomatis dari NIS'],
+        ['  - NIS harus unik, tidak boleh duplikat'],
+        ['  - Baris kosong akan dilewati otomatis'],
+      ].forEach(([text], i) => {
+        const cell = ws2.getCell(`A${i + 1}`);
+        cell.value = text || '';
+        if (i === 0) cell.font = { bold: true, size: 13 };
+        else if (text?.startsWith('Kolom') || text?.startsWith('Format') || text?.startsWith('Kode') || text?.startsWith('Catatan')) {
+          cell.font = { bold: true };
+        }
+      });
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', 'attachment; filename="template_import_siswa.xlsx"');
+      await wb.xlsx.write(res);
+      res.end();
+    } catch (err: any) {
+      logger.info('BULK', `Template error: ${err.message}`);
+      res.status(500).json({ error: 'Gagal membuat template.' });
+    }
+  });
+
+  // POST /api/students/bulk-upload — import students from Excel
+  app.post('/api/students/bulk-upload', authenticate, authorize([Role.SUPER_ADMIN, Role.TU]), upload.single('file'), async (req: AuthRequest, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ error: 'File tidak ditemukan. Pilih file .xlsx terlebih dahulu.' });
+
+      const ExcelJS = await import('exceljs');
+      const bcrypt = await import('bcryptjs');
+
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(req.file.buffer);
+      const ws = wb.worksheets[0];
+      if (!ws) return res.status(400).json({ error: 'Sheet tidak ditemukan dalam file Excel.' });
+
+      // Load all classes with majors for matching
+      const allClasses = await prisma.class.findMany({ include: { major: true } });
+
+      // Build lookup: normalizedKey → classId
+      // "XAKL" → {grade:10, majorCode:"AKL"} → find class
+      function parseKelas(raw: string): { grade: number; majorCode: string } | null {
+        const s = raw.trim().toUpperCase().replace(/\s+/g, '');
+        if (s.startsWith('XII')) return { grade: 12, majorCode: s.slice(3) };
+        if (s.startsWith('XI'))  return { grade: 11, majorCode: s.slice(2) };
+        if (s.startsWith('X'))   return { grade: 10, majorCode: s.slice(1) };
+        return null;
+      }
+
+      function findClass(kelas: string) {
+        // Try grade+major code match first
+        const parsed = parseKelas(kelas);
+        if (parsed) {
+          const match = allClasses.find(c =>
+            c.grade === parsed.grade &&
+            c.major?.code?.toUpperCase() === parsed.majorCode
+          );
+          if (match) return match;
+        }
+        // Fallback: normalize class name directly
+        const norm = kelas.toUpperCase().replace(/\s+/g, '');
+        return allClasses.find(c => c.name.toUpperCase().replace(/\s+/g, '') === norm) || null;
+      }
+
+      const rows: Array<{ row: number; nama: string; nis: string; status: 'success' | 'error'; message?: string }> = [];
+      let success = 0;
+      let failed = 0;
+      let dataRowIndex = 0;
+
+      ws.eachRow({ includeEmpty: false }, (row, rowNum) => {
+        if (rowNum === 1) return; // Skip header
+
+        const vals = row.values as any[];
+        const nama     = String(vals[1] ?? '').trim();
+        const nis      = String(vals[2] ?? '').trim();
+        const password = String(vals[3] ?? '').trim();
+        const kelas    = String(vals[4] ?? '').trim();
+
+        if (!nama && !nis) return; // skip blank rows
+
+        rows.push({ row: rowNum, nama, nis, status: 'error', message: '' });
+      });
+
+      // Process each row
+      for (const entry of rows) {
+        const rowData = ws.getRow(entry.row).values as any[];
+        const nama     = String(rowData[1] ?? '').trim();
+        const nis      = String(rowData[2] ?? '').trim();
+        const password = String(rowData[3] ?? '').trim();
+        const kelas    = String(rowData[4] ?? '').trim();
+
+        // Validation
+        if (!nama) { entry.status = 'error'; entry.message = 'Nama wajib diisi.'; failed++; continue; }
+        if (!nis)  { entry.status = 'error'; entry.message = 'NIS wajib diisi.'; failed++; continue; }
+        if (!password || password.length < 6) { entry.status = 'error'; entry.message = 'Password minimal 6 karakter.'; failed++; continue; }
+        if (!kelas) { entry.status = 'error'; entry.message = 'Kelas wajib diisi.'; failed++; continue; }
+
+        const cls = findClass(kelas);
+        if (!cls) {
+          entry.status = 'error';
+          entry.message = `Kelas "${kelas}" tidak ditemukan. Gunakan format seperti XAKL, XIPM, XIIMPLB.`;
+          failed++;
+          continue;
+        }
+
+        const email = `${nis.toLowerCase()}@siswa.osdai.id`;
+        const nisn  = nis.length >= 10 ? nis : nis.padStart(10, '0');
+
+        try {
+          const hashedPwd = await bcrypt.hash(password, 10);
+          await prisma.$transaction(async (tx) => {
+            // Check duplicates
+            const dupUser = await tx.user.findUnique({ where: { email } });
+            if (dupUser) throw new Error(`Email ${email} sudah terdaftar.`);
+
+            const dupNis = await tx.student.findFirst({ where: { nis } });
+            if (dupNis) throw new Error(`NIS ${nis} sudah terdaftar.`);
+
+            const dupNisn = await tx.student.findFirst({ where: { nisn } });
+            if (dupNisn) throw new Error(`NISN ${nisn} sudah digunakan.`);
+
+            const user = await tx.user.create({
+              data: { name: nama, email, password: hashedPwd, role: 'SISWA' },
+            });
+
+            await tx.student.create({
+              data: { userId: user.id, nis, nisn, classId: cls.id, status: 'ACTIVE' },
+            });
+
+            await tx.auditLog.create({
+              data: {
+                userId: req.user!.userId,
+                action: 'CREATE',
+                entity: 'Student',
+                entityId: user.id,
+                newValue: JSON.stringify({ nama, nis, kelas }),
+              },
+            });
+          });
+
+          entry.status = 'success';
+          success++;
+        } catch (err: any) {
+          entry.status = 'error';
+          entry.message = err.message || 'Gagal menyimpan data siswa.';
+          failed++;
+        }
+      }
+
+      return res.json({ total: rows.length, success, failed, rows });
+    } catch (err: any) {
+      logger.info('BULK', `Upload error: ${err.message}`);
+      return res.status(500).json({ error: 'Gagal memproses file. Pastikan format file sesuai template.' });
+    }
+  });
+
   app.patch('/api/students/:id', authenticate, authorize([Role.SUPER_ADMIN, Role.TU]), async (req: AuthRequest, res) => {
     try {
       const student = await StudentService.update(req.params.id, req.body, req.user!.userId);

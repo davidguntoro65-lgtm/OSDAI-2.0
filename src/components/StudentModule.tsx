@@ -15,8 +15,10 @@ import {
   ChevronLeft,
   ChevronRight,
   BrainCircuit,
-  Settings2
+  Settings2,
+  Upload,
 } from 'lucide-react';
+import BulkUploadModal from '@/components/BulkUploadModal';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -52,6 +54,7 @@ export default function StudentModule({ authToken }: { authToken: string }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<any>(null);
   const [classes, setClasses] = useState<any[]>([]);
+  const [showBulkUpload, setShowBulkUpload] = useState(false);
 
   const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<StudentFormValues>({
     resolver: zodResolver(studentSchema)
@@ -154,6 +157,9 @@ export default function StudentModule({ authToken }: { authToken: string }) {
         <div className="flex items-center gap-3">
           <Button variant="outline" className="rounded-xl border-[#EBEBE8] h-11" onClick={handleExport}>
             <Download size={18} className="mr-2" /> Export
+          </Button>
+          <Button variant="outline" className="rounded-xl border-[#EBEBE8] h-11" onClick={() => setShowBulkUpload(true)}>
+            <Upload size={18} className="mr-2" /> Import Massal
           </Button>
           <Button className="rounded-xl bg-[#1A1A1A] h-11" onClick={() => { setEditingStudent(null); reset(); setIsModalOpen(true); }}>
             <Plus size={18} className="mr-2" /> Add Student
@@ -312,6 +318,15 @@ export default function StudentModule({ authToken }: { authToken: string }) {
           </div>
         </CardContent>
       </Card>
+
+      {/* Bulk Upload Modal */}
+      {showBulkUpload && (
+        <BulkUploadModal
+          authToken={authToken}
+          onClose={() => setShowBulkUpload(false)}
+          onDone={() => { fetchStudents(); }}
+        />
+      )}
 
       {/* Create/Edit Modal */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
