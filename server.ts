@@ -3116,6 +3116,35 @@ async function startServer() {
     } catch (error: any) { res.status(500).json({ error: error.message }); }
   });
 
+  // Bulk create classes — skips duplicates, returns created/skipped counts
+  app.post('/api/classes/bulk', authenticate, authorize([Role.SUPER_ADMIN, Role.TU]), async (req, res) => {
+    try {
+      const { classes: items, academicYearId } = req.body;
+      if (!Array.isArray(items) || items.length === 0) return res.status(400).json({ error: 'Daftar kelas kosong.' });
+      if (!academicYearId) return res.status(400).json({ error: 'academicYearId wajib.' });
+      const created: any[] = [];
+      const skipped: string[] = [];
+      for (const item of items) {
+        if (!item.name?.trim() || !item.majorId) { skipped.push(item.name ?? '?'); continue; }
+        try {
+          const cls = await prisma.class.create({
+            data: {
+              name: item.name.trim(),
+              grade: parseInt(item.grade) || 10,
+              majorId: item.majorId,
+              academicYearId,
+            },
+            include: { major: true },
+          });
+          created.push(cls);
+        } catch {
+          skipped.push(item.name);
+        }
+      }
+      res.status(201).json({ created: created.length, skipped: skipped.length, skippedNames: skipped, classes: created });
+    } catch (error: any) { res.status(500).json({ error: error.message }); }
+  });
+
   app.patch('/api/classes/:id', authenticate, authorize([Role.SUPER_ADMIN, Role.TU]), async (req, res) => {
     try {
       const { name, grade, majorId } = req.body;
