@@ -366,7 +366,7 @@ async function startServer() {
         limit: 99999,
       });
 
-      const ExcelJS = await import('exceljs');
+      const { default: ExcelJS } = await import('exceljs');
       const wb = new ExcelJS.Workbook();
       wb.creator = 'OSDAI v2.0';
       wb.lastModifiedBy = 'OSDAI';
@@ -546,7 +546,7 @@ async function startServer() {
   // GET /api/students/bulk-template — download Excel import template
   app.get('/api/students/bulk-template', authenticate, authorize([Role.SUPER_ADMIN, Role.TU]), async (_req, res) => {
     try {
-      const ExcelJS = await import('exceljs');
+      const { default: ExcelJS } = await import('exceljs');
       const wb = new ExcelJS.Workbook();
       wb.creator = 'OSDAI';
       const ws = wb.addWorksheet('Import Siswa');
@@ -638,7 +638,7 @@ async function startServer() {
     try {
       if (!req.file) return res.status(400).json({ error: 'File tidak ditemukan. Pilih file .xlsx terlebih dahulu.' });
 
-      const ExcelJS = await import('exceljs');
+      const { default: ExcelJS } = await import('exceljs');
       const bcrypt = await import('bcryptjs');
 
       const wb = new ExcelJS.Workbook();
@@ -2587,7 +2587,7 @@ async function startServer() {
         return { no: idx + 1, name: student.user.name, hadir, terlambat, izin, sakit, alfa, total, persen };
       });
 
-      const ExcelJS = await import('exceljs');
+      const { default: ExcelJS } = await import('exceljs');
       const wb = new ExcelJS.Workbook();
       wb.creator = 'OSDAI v2.0';
       wb.created = new Date();

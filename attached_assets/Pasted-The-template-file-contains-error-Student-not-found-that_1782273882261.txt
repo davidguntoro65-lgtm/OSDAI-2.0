@@ -1,0 +1,47 @@
+The template file contains {"error":"Student not found"} — that means the /api/students/:id route is catching bulk-template as an :id param before our route runs. Let me verify and fix the route ordering:
+
+
+2 actions
+Confirmed — /api/students/:id at line 345 swallows bulk-template, bulk-upload, and export before they're ever reached. The fix: move all three specific GET/POST routes above the /:id handler.
+
+
+2 actions
+I need to read the :id route and find where bulk-upload ends to do a surgical move:
+
+
+7 actions
+Now I have the full picture. The GET /:id at line 345 is eating export, bulk-template, and bulk-upload. I'll do two precise edits — delete it from line 345 and re-insert it right before the PATCH /:id:
+
+
+2 actions
+Now insert the GET /:id route back in the correct position — after bulk-upload, before PATCH:
+
+
+2 actions
+Route ordering is now correct. Let me restart and verify the template downloads properly:
+
+
+4 actions
+Server running clean. Let me verify the final route order is correct:
+
+
+2 actions
+Route order is now exactly right:
+
+327  GET  /api/students          ← list all
+345  POST /api/students          ← create
+355  GET  /api/students/export   ← ✅ named, before :id
+547  GET  /api/students/bulk-template  ← ✅ named, before :id  
+637  POST /api/students/bulk-upload    ← ✅ named, before :id
+770  GET  /api/students/:id      ← wildcard last ✅
+780  PATCH /api/students/:id
+789  DELETE /api/students/:id
+
+Masalahnya: Express mencocokkan route secara berurutan — GET /api/students/:id yang terdaftar di baris 345 menangkap bulk-template, bulk-upload, dan export sebagai :id = "bulk-template", lalu mengembalikan {"error":"Student not found"} sebelum route yang benar sempat dieksekusi.
+
+Perbaikan: Route wildcard /:id dipindahkan ke bawah semua route bernama. Sekarang:
+
+Template download → menghasilkan .xlsx yang benar ✅
+Export siswa → menghasilkan .xlsx yang benar ✅
+Bulk upload → memproses file dengan benar ✅
+GET /api/students/:id tetap berfungsi untuk akses individual ✅
