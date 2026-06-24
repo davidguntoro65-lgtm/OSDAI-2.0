@@ -863,6 +863,157 @@ async function startServer() {
     }
   });
 
+  // POST /api/students/validate-rows — validate JSON rows without writing to DB
+  app.post('/api/students/validate-rows', authenticate, authorize([Role.SUPER_ADMIN, Role.TU]), async (req: AuthRequest, res) => {
+    try {
+      const { rows: inputRows } = req.body as { rows: Array<{ idx: number; nama: string; nis: string; password: string; kelas: string }> };
+      if (!Array.isArray(inputRows) || inputRows.length === 0)
+        return res.status(400).json({ error: 'Tidak ada baris yang dikirim.' });
+
+      const allClasses = await prisma.class.findMany({ include: { major: true } });
+
+      function parseKelas(raw: string) {
+        const s = raw.trim().toUpperCase().replace(/\s+/g, '');
+        if (s.startsWith('XII')) return { grade: 12, majorCode: s.slice(3) };
+        if (s.startsWith('XI'))  return { grade: 11, majorCode: s.slice(2) };
+        if (s.startsWith('X'))   return { grade: 10, majorCode: s.slice(1) };
+        return null;
+      }
+      function findClass(kelas: string) {
+        const parsed = parseKelas(kelas);
+        if (parsed) {
+          const m = allClasses.find(c => c.grade === parsed.grade && c.major?.code?.toUpperCase() === parsed.majorCode);
+          if (m) return m;
+        }
+        const norm = kelas.toUpperCase().replace(/\s+/g, '');
+        return allClasses.find(c => c.name.toUpperCase().replace(/\s+/g, '') === norm) || null;
+      }
+
+      const nisInBatch = new Set<string>();
+      const results = await Promise.all(inputRows.map(async (r) => {
+        const nama = r.nama?.trim() || '';
+        const nis  = r.nis?.trim() || '';
+        const pwd  = r.password?.trim() || '';
+        const kel  = r.kelas?.trim() || '';
+
+        if (!nama) return { idx: r.idx, status: 'error', message: 'Nama wajib diisi.' };
+        if (!nis)  return { idx: r.idx, status: 'error', message: 'NIS wajib diisi.' };
+        if (!pwd || pwd.length < 6) return { idx: r.idx, status: 'error', message: 'Password minimal 6 karakter.' };
+        if (!kel)  return { idx: r.idx, status: 'error', message: 'Kelas wajib diisi.' };
+        if (nisInBatch.has(nis)) return { idx: r.idx, status: 'error', message: `NIS ${nis} duplikat dalam data yang diedit.` };
+        nisInBatch.add(nis);
+
+        const cls = findClass(kel);
+        if (!cls) return { idx: r.idx, status: 'error', message: `Kelas "${kel}" tidak ditemukan. Contoh: XAKL, XIPM, XIIMPLB.`, className: null };
+
+        const email = `${nis.toLowerCase()}@siswa.osdai.id`;
+        const nisn  = nis.length >= 10 ? nis : nis.padStart(10, '0');
+
+        const [dupNis, dupEmail] = await Promise.all([
+          prisma.student.findFirst({ where: { nis } }),
+          prisma.user.findUnique({ where: { email } }),
+        ]);
+        if (dupNis)   return { idx: r.idx, status: 'error', message: `NIS ${nis} sudah terdaftar di database.`, className: cls.name };
+        if (dupEmail) return { idx: r.idx, status: 'error', message: `Email untuk NIS ${nis} sudah terdaftar.`, className: cls.name };
+
+        return { idx: r.idx, status: 'valid', className: cls.name };
+      }));
+
+      return res.json({ results });
+    } catch (err: any) {
+      logger.info('BULK', `Validate-rows error: ${err.message}`);
+      return res.status(500).json({ error: 'Gagal memvalidasi baris.' });
+    }
+  });
+
+  // POST /api/students/bulk-import-json — import rows from JSON (used after inline editing)
+  app.post('/api/students/bulk-import-json', authenticate, authorize([Role.SUPER_ADMIN, Role.TU]), async (req: AuthRequest, res) => {
+    try {
+      const { rows: inputRows } = req.body as { rows: Array<{ nama: string; nis: string; password: string; kelas: string }> };
+      if (!Array.isArray(inputRows) || inputRows.length === 0)
+        return res.status(400).json({ error: 'Tidak ada data untuk diimport.' });
+
+      const allClasses = await prisma.class.findMany({ include: { major: true } });
+
+      function parseKelas(raw: string) {
+        const s = raw.trim().toUpperCase().replace(/\s+/g, '');
+        if (s.startsWith('XII')) return { grade: 12, majorCode: s.slice(3) };
+        if (s.startsWith('XI'))  return { grade: 11, majorCode: s.slice(2) };
+        if (s.startsWith('X'))   return { grade: 10, majorCode: s.slice(1) };
+        return null;
+      }
+      function findClass(kelas: string) {
+        const parsed = parseKelas(kelas);
+        if (parsed) {
+          const m = allClasses.find(c => c.grade === parsed.grade && c.major?.code?.toUpperCase() === parsed.majorCode);
+          if (m) return m;
+        }
+        const norm = kelas.toUpperCase().replace(/\s+/g, '');
+        return allClasses.find(c => c.name.toUpperCase().replace(/\s+/g, '') === norm) || null;
+      }
+
+      const { default: bcrypt } = await import('bcryptjs');
+      const rows: Array<{ row: number; nama: string; nis: string; status: 'success' | 'error'; message?: string }> = [];
+      let success = 0;
+      let failed = 0;
+
+      for (let i = 0; i < inputRows.length; i++) {
+        const { nama, nis, password, kelas } = inputRows[i];
+        const entry = { row: i + 1, nama, nis, status: 'error' as const, message: '' };
+
+        if (!nama) { entry.message = 'Nama wajib diisi.'; failed++; rows.push(entry); continue; }
+        if (!nis)  { entry.message = 'NIS wajib diisi.'; failed++; rows.push(entry); continue; }
+        if (!password || password.length < 6) { entry.message = 'Password minimal 6 karakter.'; failed++; rows.push(entry); continue; }
+        if (!kelas) { entry.message = 'Kelas wajib diisi.'; failed++; rows.push(entry); continue; }
+
+        const cls = findClass(kelas);
+        if (!cls) { entry.message = `Kelas "${kelas}" tidak ditemukan.`; failed++; rows.push(entry); continue; }
+
+        const email = `${nis.toLowerCase()}@siswa.osdai.id`;
+        const nisn  = nis.length >= 10 ? nis : nis.padStart(10, '0');
+
+        try {
+          const hashedPwd = await bcrypt.hash(password, 10);
+          await prisma.$transaction(async (tx) => {
+            const dupUser = await tx.user.findUnique({ where: { email } });
+            if (dupUser) throw new Error(`Email ${email} sudah terdaftar.`);
+            const dupNis = await tx.student.findFirst({ where: { nis } });
+            if (dupNis) throw new Error(`NIS ${nis} sudah terdaftar.`);
+            const dupNisn = await tx.student.findFirst({ where: { nisn } });
+            if (dupNisn) throw new Error(`NISN ${nisn} sudah digunakan.`);
+
+            const user = await tx.user.create({
+              data: { name: nama, email, password: hashedPwd, role: 'SISWA' },
+            });
+            await tx.student.create({
+              data: { userId: user.id, nis, nisn, classId: cls.id, status: 'ACTIVE' },
+            });
+            await tx.auditLog.create({
+              data: {
+                userId: req.user!.userId,
+                action: 'CREATE',
+                entity: 'Student',
+                entityId: user.id,
+                newValue: JSON.stringify({ nama, nis, kelas }),
+              },
+            });
+          });
+          rows.push({ row: i + 1, nama, nis, status: 'success' });
+          success++;
+        } catch (err: any) {
+          entry.message = err.message || 'Gagal menyimpan.';
+          failed++;
+          rows.push(entry);
+        }
+      }
+
+      return res.json({ total: rows.length, success, failed, rows });
+    } catch (err: any) {
+      logger.info('BULK', `Import-json error: ${err.message}`);
+      return res.status(500).json({ error: 'Gagal mengimport data.' });
+    }
+  });
+
   // GET /api/students/:id — must be AFTER all named sub-routes
   app.get('/api/students/:id', authenticate, async (req, res) => {
     try {
