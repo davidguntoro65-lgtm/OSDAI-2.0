@@ -3160,6 +3160,86 @@ async function startServer() {
     } catch (error: any) { res.status(500).json({ error: error.message }); }
   });
 
+  // Academic Years API
+  app.get('/api/academic/years', authenticate, async (_req, res) => {
+    try {
+      const years = await prisma.academicYear.findMany({ orderBy: { name: 'desc' } });
+      res.json(years);
+    } catch (error: any) { res.status(500).json({ error: error.message }); }
+  });
+
+  app.post('/api/academic/years', authenticate, authorize([Role.SUPER_ADMIN, Role.TU]), async (req, res) => {
+    try {
+      const { name, term, startDate, endDate, isActive } = req.body;
+      if (!name?.trim()) return res.status(400).json({ error: 'Nama tahun ajaran wajib diisi.' });
+      if (isActive) await prisma.academicYear.updateMany({ data: { isActive: false } });
+      const ay = await prisma.academicYear.create({
+        data: { name: name.trim(), term: parseInt(term) || 1, startDate: new Date(startDate), endDate: new Date(endDate), isActive: !!isActive },
+      });
+      res.status(201).json(ay);
+    } catch (error: any) { res.status(500).json({ error: error.message }); }
+  });
+
+  app.patch('/api/academic/years/:id/activate', authenticate, authorize([Role.SUPER_ADMIN, Role.TU]), async (req, res) => {
+    try {
+      await prisma.academicYear.updateMany({ data: { isActive: false } });
+      const ay = await prisma.academicYear.update({ where: { id: req.params.id }, data: { isActive: true } });
+      res.json(ay);
+    } catch (error: any) { res.status(500).json({ error: error.message }); }
+  });
+
+  // Setup Wizard — atomic initialization of academic year + majors + classes
+  app.post('/api/setup/initialize', authenticate, authorize([Role.SUPER_ADMIN, Role.TU]), async (req, res) => {
+    try {
+      const { academicYear, majors, classes } = req.body;
+      if (!academicYear?.name) return res.status(400).json({ error: 'Data tahun ajaran tidak valid.' });
+      if (!Array.isArray(majors) || majors.length === 0) return res.status(400).json({ error: 'Pilih minimal 1 jurusan.' });
+      if (!Array.isArray(classes) || classes.length === 0) return res.status(400).json({ error: 'Buat minimal 1 kelas.' });
+
+      const created = { academicYear: null as any, majors: [] as any[], classes: [] as any[] };
+
+      // 1. Academic year
+      if (academicYear.isActive) await prisma.academicYear.updateMany({ data: { isActive: false } });
+      created.academicYear = await prisma.academicYear.upsert({
+        where: { name: academicYear.name },
+        update: { term: academicYear.term, startDate: new Date(academicYear.startDate), endDate: new Date(academicYear.endDate), isActive: !!academicYear.isActive },
+        create: { name: academicYear.name, term: academicYear.term || 1, startDate: new Date(academicYear.startDate), endDate: new Date(academicYear.endDate), isActive: !!academicYear.isActive },
+      });
+
+      // 2. Majors (upsert by code)
+      for (const m of majors) {
+        const major = await prisma.major.upsert({
+          where: { code: m.code },
+          update: { name: m.name, description: m.description ?? null },
+          create: { code: m.code, name: m.name, description: m.description ?? null },
+        });
+        created.majors.push(major);
+      }
+
+      // 3. Classes (skip if already exists by unique constraint name+academicYearId)
+      const majorByCode = Object.fromEntries(created.majors.map((m: any) => [m.code, m.id]));
+      for (const cls of classes) {
+        const majorId = majorByCode[cls.majorCode];
+        if (!majorId) continue;
+        try {
+          const c = await prisma.class.create({
+            data: { name: cls.name, grade: parseInt(cls.grade), majorId, academicYearId: created.academicYear.id },
+          });
+          created.classes.push(c);
+        } catch { /* skip duplicates */ }
+      }
+
+      res.status(201).json({
+        success: true,
+        summary: {
+          academicYear: created.academicYear.name,
+          majorsCreated: created.majors.length,
+          classesCreated: created.classes.length,
+        },
+      });
+    } catch (error: any) { res.status(500).json({ error: error.message }); }
+  });
+
   // Academic Endpoints
   app.get('/api/timetable/:classId', authenticate, async (req, res) => {
     try {

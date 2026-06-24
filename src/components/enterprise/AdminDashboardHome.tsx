@@ -1,15 +1,16 @@
 import { useState, useEffect } from 'react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   Users, GraduationCap, Server, Activity, HardDrive, Radio,
   TrendingUp, AlertTriangle, CheckCircle2, Clock, BrainCircuit,
   Zap, Database, Shield, ChevronRight, RefreshCcw, Globe,
   BarChart3, DollarSign, BookOpen, ArrowUpRight, ArrowDownRight,
-  Cpu, Wifi, Package
+  Cpu, Wifi, Package, Sparkles, Layers
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
 
 import { C } from '@/lib/themeC';
+import SetupWizardModal from './SetupWizardModal';
 
 const KpiCard = ({ label, value, sub, icon: Icon, color, trend, trendUp }: any) => (
   <div className="rounded-xl p-4 flex flex-col gap-3" style={{ background: C.card, border: `1px solid ${C.border}`, boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
@@ -68,22 +69,29 @@ export default function AdminDashboardHome({ authToken, user, onNavigate }: { au
   const [loading, setLoading] = useState(true);
   const [securityLogs, setSecurityLogs] = useState<any[]>([]);
   const [lastRefresh, setLastRefresh] = useState(new Date());
+  const [showWizard, setShowWizard] = useState(false);
+  const [classCount, setClassCount] = useState<number | null>(null);
 
   const headers = { Authorization: `Bearer ${authToken}` };
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [statsRes, riskRes, sessRes, secRes] = await Promise.allSettled([
+      const [statsRes, riskRes, sessRes, secRes, classRes] = await Promise.allSettled([
         fetch('/api/analytics/overall-stats', { headers }),
         fetch('/api/analytics/risk-students', { headers }),
         fetch('/api/intelligence/semua-sesi-aktif', { headers }),
         fetch('/api/auth/security-logs?limit=5', { headers }),
+        fetch('/api/classes', { headers }),
       ]);
       if (statsRes.status === 'fulfilled' && statsRes.value.ok) setStats(await statsRes.value.json());
       if (riskRes.status === 'fulfilled' && riskRes.value.ok) setRiskStudents(await riskRes.value.json());
       if (sessRes.status === 'fulfilled' && sessRes.value.ok) setActiveSessions(await sessRes.value.json());
       if (secRes.status === 'fulfilled' && secRes.value.ok) setSecurityLogs(await secRes.value.json());
+      if (classRes.status === 'fulfilled' && classRes.value.ok) {
+        const cls = await classRes.value.json();
+        setClassCount(Array.isArray(cls) ? cls.length : 0);
+      }
     } catch { /* no-op */ }
     finally { setLoading(false); setLastRefresh(new Date()); }
   };
@@ -94,6 +102,17 @@ export default function AdminDashboardHome({ authToken, user, onNavigate }: { au
 
   return (
     <div className="p-6 space-y-6">
+      {/* Wizard Modal */}
+      <AnimatePresence>
+        {showWizard && (
+          <SetupWizardModal
+            authToken={authToken}
+            onClose={() => setShowWizard(false)}
+            onSuccess={() => fetchData()}
+          />
+        )}
+      </AnimatePresence>
+
       {/* Top bar */}
       <div className="flex items-center justify-between">
         <div>
@@ -102,15 +121,56 @@ export default function AdminDashboardHome({ authToken, user, onNavigate }: { au
             {new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} · Terakhir diperbarui: {lastRefresh.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
           </p>
         </div>
-        <button
-          onClick={fetchData}
-          className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold border transition-all hover:bg-gray-50"
-          style={{ borderColor: C.border, color: C.textMuted }}
-        >
-          <RefreshCcw size={12} className={loading ? 'animate-spin' : ''} />
-          Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowWizard(true)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all"
+            style={{ background: `${C.primary}14`, color: C.primary, border: `1px solid ${C.primary}30` }}
+          >
+            <Sparkles size={12} />
+            Setup Wizard
+          </button>
+          <button
+            onClick={fetchData}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold border transition-all hover:bg-gray-50"
+            style={{ borderColor: C.border, color: C.textMuted }}
+          >
+            <RefreshCcw size={12} className={loading ? 'animate-spin' : ''} />
+            Refresh
+          </button>
+        </div>
       </div>
+
+      {/* Setup Banner — shown when no classes exist yet */}
+      <AnimatePresence>
+        {classCount === 0 && !loading && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            className="rounded-xl p-4 flex items-center gap-4"
+            style={{ background: `linear-gradient(135deg, ${C.primary}18 0%, #7c3aed18 100%)`, border: `1px solid ${C.primary}30` }}
+          >
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: C.primary }}>
+              <Layers size={20} color="#fff" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-black" style={{ color: C.text }}>Belum ada data kelas</p>
+              <p className="text-xs mt-0.5" style={{ color: C.textMuted }}>
+                Gunakan Setup Wizard untuk membuat tahun ajaran, jurusan, dan kelas secara cepat dalam satu langkah.
+              </p>
+            </div>
+            <button
+              onClick={() => setShowWizard(true)}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-bold flex-shrink-0 transition-all"
+              style={{ background: C.primary, color: '#fff' }}
+            >
+              <Sparkles size={14} />
+              Mulai Setup
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
