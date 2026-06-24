@@ -3180,11 +3180,35 @@ async function startServer() {
     } catch (error: any) { res.status(500).json({ error: error.message }); }
   });
 
+  app.patch('/api/academic/years/:id', authenticate, authorize([Role.SUPER_ADMIN, Role.TU]), async (req, res) => {
+    try {
+      const { name, term, startDate, endDate, isActive } = req.body;
+      const data: any = {};
+      if (name)      data.name      = name.trim();
+      if (term)      data.term      = parseInt(term);
+      if (startDate) data.startDate = new Date(startDate);
+      if (endDate)   data.endDate   = new Date(endDate);
+      if (isActive !== undefined) {
+        if (isActive) await prisma.academicYear.updateMany({ data: { isActive: false } });
+        data.isActive = !!isActive;
+      }
+      const ay = await prisma.academicYear.update({ where: { id: req.params.id }, data });
+      res.json(ay);
+    } catch (error: any) { res.status(500).json({ error: error.message }); }
+  });
+
   app.patch('/api/academic/years/:id/activate', authenticate, authorize([Role.SUPER_ADMIN, Role.TU]), async (req, res) => {
     try {
       await prisma.academicYear.updateMany({ data: { isActive: false } });
       const ay = await prisma.academicYear.update({ where: { id: req.params.id }, data: { isActive: true } });
       res.json(ay);
+    } catch (error: any) { res.status(500).json({ error: error.message }); }
+  });
+
+  app.delete('/api/academic/years/:id', authenticate, authorize([Role.SUPER_ADMIN, Role.TU]), async (req, res) => {
+    try {
+      await prisma.academicYear.delete({ where: { id: req.params.id } });
+      res.json({ success: true });
     } catch (error: any) { res.status(500).json({ error: error.message }); }
   });
 

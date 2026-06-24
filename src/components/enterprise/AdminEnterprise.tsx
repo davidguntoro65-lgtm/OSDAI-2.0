@@ -12,6 +12,7 @@ import AIAnalyticsModule from '../AIAnalyticsModule';
 import LMSModule from '../LMSModule';
 import ProgramStudiModule from './ProgramStudiModule';
 import KelasRombelModule from './KelasRombelModule';
+import TahunAjaranModule from './TahunAjaranModule';
 import {
   ServerMonitorModule,
   ApiMonitorModule,
@@ -61,6 +62,8 @@ export default function AdminEnterprise({ user, authToken, onLogout, onSwitchMob
         return <SubjectModule authToken={authToken} />;
       case 'kelas-rombel':
         return <KelasRombelModule authToken={authToken} />;
+      case 'tahun-ajaran':
+        return <TahunAjaranModule authToken={authToken} />;
       case 'penjadwalan':
         return <TimetableModule authToken={authToken} />;
       case 'kalender':

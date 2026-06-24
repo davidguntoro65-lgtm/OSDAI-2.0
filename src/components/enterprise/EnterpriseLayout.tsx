@@ -18,7 +18,7 @@ import ChangePasswordModal from '@/components/ChangePasswordModal';
 // ── Types ──────────────────────────────────────────────────────────────────────
 export type EnterpriseModule =
   | 'dashboard' | 'siswa' | 'guru' | 'program-studi' | 'mata-pelajaran'
-  | 'kelas-rombel' | 'penjadwalan' | 'kalender' | 'sinkronisasi'
+  | 'kelas-rombel' | 'tahun-ajaran' | 'penjadwalan' | 'kalender' | 'sinkronisasi'
   | 'server-monitor' | 'api-monitor' | 'queue' | 'db-health' | 'ai-engine'
   | 'audit-log' | 'login-monitor' | 'otp-monitor' | 'device-monitor' | 'permission'
   | 'backup' | 'restore' | 'arsip-digital' | 'keuangan' | 'surat-digital'
@@ -51,6 +51,7 @@ const ADMIN_SIDEBAR: SidebarGroup[] = [
       { id: 'program-studi', label: 'Program Studi', icon: Award },
       { id: 'mata-pelajaran', label: 'Mata Pelajaran', icon: BookOpen },
       { id: 'kelas-rombel', label: 'Kelas & Rombel', icon: Layers },
+      { id: 'tahun-ajaran', label: 'Tahun Ajaran', icon: Calendar },
     ]
   },
   {
