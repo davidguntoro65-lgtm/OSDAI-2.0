@@ -23,7 +23,7 @@ export type EnterpriseModule =
   | 'audit-log' | 'login-monitor' | 'otp-monitor' | 'device-monitor' | 'permission'
   | 'backup' | 'restore' | 'arsip-digital' | 'keuangan' | 'surat-digital'
   | 'ai-analytics' | 'lms' | 'inventory'
-  | 'geofence-gps'
+  | 'geofence-gps' | 'rekap-absensi'
   // Guru modules
   | 'jadwal-mengajar' | 'presensi-kelas' | 'penilaian' | 'materi'
   | 'rekap-kehadiran' | 'komunikasi' | 'laporan-guru';
@@ -101,6 +101,7 @@ const ADMIN_SIDEBAR: SidebarGroup[] = [
     icon: MapPin,
     items: [
       { id: 'geofence-gps', label: 'Geofence GPS', icon: MapPin },
+      { id: 'rekap-absensi', label: 'Rekap Absensi', icon: BarChart3 },
     ]
   },
   {

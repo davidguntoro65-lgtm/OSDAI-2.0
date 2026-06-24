@@ -2538,6 +2538,200 @@ async function startServer() {
     } catch (error: any) { res.status(500).json({ error: error.message }); }
   });
 
+  // GET /api/intelligence/rekap/export — Professional A4 Excel rekap absensi
+  app.get('/api/intelligence/rekap/export', authenticate, authorize([Role.GURU, Role.SUPER_ADMIN, Role.KEPALA_SEKOLAH, Role.BK, Role.TU]), async (req, res) => {
+    try {
+      const { classId, from, to } = req.query as Record<string, string>;
+      if (!classId) return res.status(400).json({ error: 'classId wajib diisi.' });
+
+      const cls = await prisma.class.findUnique({
+        where: { id: classId },
+        include: { major: true, academicYear: true },
+      });
+
+      const dateFilter: any = {};
+      if (from) dateFilter.gte = new Date(from);
+      if (to)   dateFilter.lte = new Date(new Date(to).setHours(23, 59, 59, 999));
+
+      const sessionWhere: any = { classId, signalStatus: 'CLOSED' };
+      if (Object.keys(dateFilter).length > 0) sessionWhere.startTime = dateFilter;
+
+      const sessions = await prisma.classSession.findMany({
+        where: sessionWhere,
+        select: { id: true, startTime: true },
+      });
+      const sessionIds = sessions.map((s: any) => s.id);
+
+      const students = await prisma.student.findMany({
+        where: { classId, status: 'ACTIVE' },
+        include: { user: { select: { name: true } } },
+        orderBy: { user: { name: 'asc' } },
+      });
+
+      const allAtt = await prisma.studentAttendance.findMany({
+        where: { sessionId: { in: sessionIds } },
+        select: { studentId: true, attendanceStatus: true },
+      });
+
+      const rows = students.map((student: any, idx: number) => {
+        const atts = allAtt.filter((a: any) => a.studentId === student.id);
+        const total      = atts.length;
+        const hadir      = atts.filter((a: any) => a.attendanceStatus === 'HADIR').length;
+        const terlambat  = atts.filter((a: any) => a.attendanceStatus === 'TERLAMBAT').length;
+        const izin       = atts.filter((a: any) => a.attendanceStatus === 'IZIN').length;
+        const sakit      = atts.filter((a: any) => a.attendanceStatus === 'SAKIT').length;
+        const alfa       = atts.filter((a: any) => a.attendanceStatus === 'ALFA').length;
+        const presentTotal = hadir + terlambat;
+        const persen     = total > 0 ? Math.round((presentTotal / total) * 100) : 0;
+        return { no: idx + 1, name: student.user.name, hadir, terlambat, izin, sakit, alfa, total, persen };
+      });
+
+      const ExcelJS = await import('exceljs');
+      const wb = new ExcelJS.Workbook();
+      wb.creator = 'OSDAI v2.0';
+      wb.created = new Date();
+
+      const ws = wb.addWorksheet('Rekap Absensi', {
+        pageSetup: {
+          paperSize: 9,
+          orientation: 'portrait',
+          fitToPage: true,
+          fitToWidth: 1,
+          fitToHeight: 0,
+          margins: { left: 0.75, right: 0.75, top: 1.0, bottom: 1.0, header: 0.4, footer: 0.4 },
+        },
+      });
+
+      const exportDate = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
+      const periodLabel = (from && to)
+        ? `${new Date(from).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })} s/d ${new Date(to).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}`
+        : 'Seluruh Periode';
+
+      ws.columns = [
+        { key: 'no',        width: 4.5 },
+        { key: 'nama',      width: 30  },
+        { key: 'hadir',     width: 9   },
+        { key: 'terlambat', width: 11  },
+        { key: 'izin',      width: 8   },
+        { key: 'sakit',     width: 8   },
+        { key: 'alfa',      width: 8   },
+        { key: 'total',     width: 8   },
+        { key: 'persen',    width: 10  },
+      ];
+
+      // Decorative top bar
+      ws.getRow(1).height = 5;
+      for (let c = 1; c <= 9; c++) {
+        ws.getRow(1).getCell(c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1A1A1A' } };
+      }
+
+      // Header rows
+      const mh = (rowNum: number, value: string, fontSize: number, bold: boolean, colorArgb: string, height: number) => {
+        ws.mergeCells(`A${rowNum}:I${rowNum}`);
+        const cell = ws.getCell(`A${rowNum}`);
+        cell.value = value;
+        cell.font = { name: 'Calibri', size: fontSize, bold, color: { argb: colorArgb } };
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        ws.getRow(rowNum).height = height;
+      };
+      mh(2, 'SMKN 1 WONOGIRI', 15, true, 'FF1A1A1A', 26);
+      mh(3, 'REKAP KEHADIRAN SISWA', 12, true, 'FF1A1A1A', 20);
+      mh(4, `Kelas: ${cls?.name ?? classId}  ·  Jurusan: ${cls?.major?.name ?? '-'}  ·  Tahun Ajaran: ${(cls as any)?.academicYear?.name ?? '-'}`, 9, false, 'FF444444', 16);
+      mh(5, `Periode: ${periodLabel}  ·  Total Sesi: ${sessions.length}  ·  Dicetak: ${exportDate}`, 9, false, 'FF888888', 14);
+      ws.getRow(6).height = 6;
+
+      // Table header row 7
+      const hRow = ws.getRow(7);
+      hRow.height = 22;
+      ['No', 'Nama Siswa', 'Hadir', 'Terlambat', 'Izin', 'Sakit', 'Alfa', 'Total', '% Hadir'].forEach((label, i) => {
+        const cell = hRow.getCell(i + 1);
+        cell.value = label;
+        cell.font = { name: 'Calibri', bold: true, size: 9, color: { argb: 'FFFFFFFF' } };
+        cell.alignment = { horizontal: i === 1 ? 'left' : 'center', vertical: 'middle' };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1A1A1A' } };
+        cell.border = { top: { style: 'thin', color: { argb: 'FF2D2D2D' } }, bottom: { style: 'thin', color: { argb: 'FF2D2D2D' } }, left: { style: 'thin', color: { argb: 'FF2D2D2D' } }, right: { style: 'thin', color: { argb: 'FF2D2D2D' } } };
+      });
+
+      // Data rows starting at row 8
+      rows.forEach((r: any, idx: number) => {
+        const rowNum = idx + 8;
+        const isEven = idx % 2 === 0;
+        const isRisk = r.persen < 75;
+        const isWarn = r.persen >= 75 && r.persen < 85;
+        const dRow = ws.getRow(rowNum);
+        dRow.height = 18;
+        const bgColor = isRisk ? 'FFFEE2E2' : isEven ? 'FFFAFAF9' : 'FFFFFFFF';
+        const statusColor = isRisk ? 'FFDC2626' : isWarn ? 'FFD97706' : 'FF16A34A';
+        const vals: any[] = [r.no, r.name, r.hadir, r.terlambat, r.izin, r.sakit, r.alfa, r.total, `${r.persen}%`];
+        vals.forEach((val, ci) => {
+          const cell = dRow.getCell(ci + 1);
+          cell.value = val;
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
+          cell.alignment = { horizontal: ci === 1 ? 'left' : 'center', vertical: 'middle' };
+          cell.border = { top: { style: 'hair', color: { argb: 'FFEBEBEB' } }, bottom: { style: 'hair', color: { argb: 'FFEBEBEB' } }, left: { style: 'hair', color: { argb: 'FFEBEBEB' } }, right: { style: 'hair', color: { argb: 'FFEBEBEB' } } };
+          if (ci === 8) cell.font = { name: 'Calibri', size: 9, bold: true, color: { argb: statusColor } };
+          else if (ci === 6 && val > 0) cell.font = { name: 'Calibri', size: 9, bold: true, color: { argb: 'FFDC2626' } };
+          else cell.font = { name: 'Calibri', size: 9, color: { argb: 'FF1A1A1A' } };
+        });
+      });
+
+      // Thick bottom border on last data row
+      if (rows.length > 0) {
+        const lastRow = ws.getRow(rows.length + 7);
+        for (let ci = 1; ci <= 9; ci++) {
+          lastRow.getCell(ci).border = { ...lastRow.getCell(ci).border, bottom: { style: 'thin', color: { argb: 'FF1A1A1A' } } };
+        }
+      }
+
+      // Summary/total row
+      const sumRowNum = rows.length + 8;
+      const sRow = ws.getRow(sumRowNum);
+      sRow.height = 20;
+      const totH  = rows.reduce((a: number, r: any) => a + r.hadir, 0);
+      const totT  = rows.reduce((a: number, r: any) => a + r.terlambat, 0);
+      const totI  = rows.reduce((a: number, r: any) => a + r.izin, 0);
+      const totS  = rows.reduce((a: number, r: any) => a + r.sakit, 0);
+      const totA  = rows.reduce((a: number, r: any) => a + r.alfa, 0);
+      const totAll = rows.reduce((a: number, r: any) => a + r.total, 0);
+      const avgP  = rows.length > 0 ? Math.round(rows.reduce((a: number, r: any) => a + r.persen, 0) / rows.length) : 0;
+      (['', 'TOTAL / RATA-RATA', totH, totT, totI, totS, totA, totAll, `${avgP}%`] as any[]).forEach((val, ci) => {
+        const cell = sRow.getCell(ci + 1);
+        cell.value = val;
+        cell.font = { name: 'Calibri', size: 9, bold: true, color: { argb: ci === 8 ? (avgP < 75 ? 'FFDC2626' : 'FF16A34A') : 'FF1A1A1A' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0F0F0' } };
+        cell.alignment = { horizontal: ci === 1 ? 'left' : 'center', vertical: 'middle' };
+        cell.border = { top: { style: 'thin', color: { argb: 'FF1A1A1A' } }, bottom: { style: 'thin', color: { argb: 'FF1A1A1A' } }, left: { style: 'hair', color: { argb: 'FFEBEBEB' } }, right: { style: 'hair', color: { argb: 'FFEBEBEB' } } };
+      });
+
+      // Notes and footer
+      const riskCount = rows.filter((r: any) => r.persen < 75).length;
+      const noteRowNum = sumRowNum + 2;
+      ws.mergeCells(`A${noteRowNum}:I${noteRowNum}`);
+      const noteCell = ws.getCell(`A${noteRowNum}`);
+      noteCell.value = `Siswa risiko kehadiran < 75%: ${riskCount} siswa  ·  Rata-rata kehadiran: ${avgP}%  ·  Total sesi: ${sessions.length}`;
+      noteCell.font = { name: 'Calibri', size: 8, italic: true, color: { argb: riskCount > 0 ? 'FFDC2626' : 'FF888888' } };
+      noteCell.alignment = { horizontal: 'center' };
+
+      ws.mergeCells(`A${noteRowNum + 1}:I${noteRowNum + 1}`);
+      const footCell = ws.getCell(`A${noteRowNum + 1}`);
+      footCell.value = 'Dokumen ini digenerate otomatis oleh Sistem OSDAI v2.0 · Tidak memerlukan tanda tangan basah';
+      footCell.font = { name: 'Calibri', size: 8, italic: true, color: { argb: 'FFAAAAAA' } };
+      footCell.alignment = { horizontal: 'center' };
+
+      ws.views = [{ state: 'frozen', xSplit: 0, ySplit: 7, topLeftCell: 'A8', activeCell: 'A8' }];
+      ws.headerFooter.oddHeader = `&C&"Calibri,Bold"&11REKAP KEHADIRAN — ${cls?.name ?? ''} — SMKN 1 WONOGIRI`;
+      ws.headerFooter.oddFooter = `&L${periodLabel}&RHalaman &P dari &N`;
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="rekap_absensi_${(cls?.name ?? classId).replace(/\s+/g, '_')}.xlsx"`);
+      await wb.xlsx.write(res);
+      res.end();
+    } catch (err: any) {
+      logger.info('EXPORT', `Rekap export error: ${err.message}`);
+      res.status(500).json({ error: 'Gagal mengekspor rekap absensi.' });
+    }
+  });
+
   // ─── ClassroomEngagement Endpoints ──────────────────────────────────────────
   // GET all engagement records for a session
   app.get('/api/intelligence/session/:sessionId/engagement', authenticate, authorize([Role.GURU, Role.SUPER_ADMIN]), async (req, res) => {

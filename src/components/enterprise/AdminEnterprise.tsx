@@ -21,6 +21,7 @@ import {
   KalenderModule,
 } from './SystemMonitorModule';
 import GeofenceModule from '../GeofenceModule';
+import RekapAbsensiModule from './RekapAbsensiModule';
 
 import { C } from '@/lib/themeC';
 
@@ -86,6 +87,8 @@ export default function AdminEnterprise({ user, authToken, onLogout, onSwitchMob
         return <BackupRestoreModule authToken={authToken} />;
       case 'geofence-gps':
         return <GeofenceModule authToken={authToken} userRole={user?.role} />;
+      case 'rekap-absensi':
+        return <RekapAbsensiModule authToken={authToken} />;
       case 'ai-engine':
         return <PlaceholderModule title="AI Engine Control" desc="Monitor dan kontrol Gemini AI engine" />;
       case 'login-monitor':
