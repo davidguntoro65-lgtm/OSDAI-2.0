@@ -633,6 +633,103 @@ async function startServer() {
     }
   });
 
+  // POST /api/students/bulk-preview — parse & validate Excel rows WITHOUT writing to DB
+  app.post('/api/students/bulk-preview', authenticate, authorize([Role.SUPER_ADMIN, Role.TU]), upload.single('file'), async (req: AuthRequest, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ error: 'File tidak ditemukan. Pilih file .xlsx terlebih dahulu.' });
+
+      const { default: ExcelJS } = await import('exceljs');
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(req.file.buffer);
+      const ws = wb.worksheets[0];
+      if (!ws) return res.status(400).json({ error: 'Sheet tidak ditemukan dalam file Excel.' });
+
+      const allClasses = await prisma.class.findMany({ include: { major: true } });
+
+      function parseKelas(raw: string): { grade: number; majorCode: string } | null {
+        const s = raw.trim().toUpperCase().replace(/\s+/g, '');
+        if (s.startsWith('XII')) return { grade: 12, majorCode: s.slice(3) };
+        if (s.startsWith('XI'))  return { grade: 11, majorCode: s.slice(2) };
+        if (s.startsWith('X'))   return { grade: 10, majorCode: s.slice(1) };
+        return null;
+      }
+
+      function findClass(kelas: string) {
+        const parsed = parseKelas(kelas);
+        if (parsed) {
+          const match = allClasses.find(c =>
+            c.grade === parsed.grade &&
+            c.major?.code?.toUpperCase() === parsed.majorCode
+          );
+          if (match) return match;
+        }
+        const norm = kelas.toUpperCase().replace(/\s+/g, '');
+        return allClasses.find(c => c.name.toUpperCase().replace(/\s+/g, '') === norm) || null;
+      }
+
+      // Track NIS/NISN within the file itself to catch internal duplicates
+      const nisInFile = new Set<string>();
+      const nisnInFile = new Set<string>();
+
+      const rows: Array<{
+        row: number; nama: string; nis: string; kelas: string;
+        className: string | null; status: 'valid' | 'error'; message?: string;
+      }> = [];
+      let validCount = 0;
+      let invalidCount = 0;
+
+      ws.eachRow({ includeEmpty: false }, async () => {}); // prime iterator
+      const rowPromises: Promise<void>[] = [];
+
+      ws.eachRow({ includeEmpty: false }, (row, rowNum) => {
+        if (rowNum === 1) return;
+        const vals = row.values as any[];
+        const nama     = String(vals[1] ?? '').trim();
+        const nis      = String(vals[2] ?? '').trim();
+        const password = String(vals[3] ?? '').trim();
+        const kelas    = String(vals[4] ?? '').trim();
+
+        if (!nama && !nis) return;
+
+        const entry: typeof rows[0] = { row: rowNum, nama, nis, kelas, className: null, status: 'error' };
+
+        if (!nama)                              { entry.message = 'Nama wajib diisi.'; invalidCount++; rows.push(entry); return; }
+        if (!nis)                               { entry.message = 'NIS wajib diisi.'; invalidCount++; rows.push(entry); return; }
+        if (!password || password.length < 6)  { entry.message = 'Password minimal 6 karakter.'; invalidCount++; rows.push(entry); return; }
+        if (!kelas)                             { entry.message = 'Kelas wajib diisi.'; invalidCount++; rows.push(entry); return; }
+
+        if (nisInFile.has(nis))  { entry.message = `NIS ${nis} duplikat di dalam file.`; invalidCount++; rows.push(entry); return; }
+        const nisn = nis.length >= 10 ? nis : nis.padStart(10, '0');
+        if (nisnInFile.has(nisn)) { entry.message = `NISN ${nisn} duplikat di dalam file.`; invalidCount++; rows.push(entry); return; }
+        nisInFile.add(nis);
+        nisnInFile.add(nisn);
+
+        const cls = findClass(kelas);
+        if (!cls) { entry.message = `Kelas "${kelas}" tidak ditemukan. Contoh: XAKL, XIPM, XIIMPLB.`; invalidCount++; rows.push(entry); return; }
+
+        entry.className = cls.name;
+        rowPromises.push(
+          prisma.student.findFirst({ where: { nis } }).then(dup => {
+            if (dup) { entry.message = `NIS ${nis} sudah terdaftar di database.`; invalidCount++; return; }
+            return prisma.user.findUnique({ where: { email: `${nis.toLowerCase()}@siswa.osdai.id` } }).then(dupU => {
+              if (dupU) { entry.message = `Email untuk NIS ${nis} sudah terdaftar.`; invalidCount++; return; }
+              entry.status = 'valid';
+              validCount++;
+            });
+          }).catch(() => { entry.message = 'Gagal memvalidasi ke database.'; invalidCount++; })
+        );
+        rows.push(entry);
+      });
+
+      await Promise.all(rowPromises);
+
+      return res.json({ total: rows.length, validCount, invalidCount, rows });
+    } catch (err: any) {
+      logger.info('BULK', `Preview error: ${err.message}`);
+      return res.status(500).json({ error: 'Gagal membaca file. Pastikan format sesuai template.' });
+    }
+  });
+
   // POST /api/students/bulk-upload — import students from Excel
   app.post('/api/students/bulk-upload', authenticate, authorize([Role.SUPER_ADMIN, Role.TU]), upload.single('file'), async (req: AuthRequest, res) => {
     try {
