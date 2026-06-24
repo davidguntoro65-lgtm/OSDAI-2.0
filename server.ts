@@ -225,6 +225,38 @@ async function startServer() {
     }
   });
 
+  // POST /api/auth/change-password — authenticated password change
+  app.post('/api/auth/change-password', authenticate, async (req: AuthRequest, res: Response) => {
+    try {
+      const { currentPassword, newPassword } = req.body;
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ message: 'Password saat ini dan password baru wajib diisi.' });
+      }
+      if (newPassword.length < 8) {
+        return res.status(400).json({ message: 'Password baru minimal 8 karakter.' });
+      }
+      if (!/[A-Z]/.test(newPassword) || !/[a-z]/.test(newPassword) || !/[0-9]/.test(newPassword)) {
+        return res.status(400).json({ message: 'Password baru harus mengandung huruf besar, huruf kecil, dan angka.' });
+      }
+      const rows = await prisma.$queryRaw<Array<{ password: string }>>`
+        SELECT password FROM "User" WHERE id = ${req.user!.userId} LIMIT 1
+      `;
+      if (!rows[0]) return res.status(404).json({ message: 'User tidak ditemukan.' });
+      const { AuthService } = await import('./src/services/auth');
+      const valid = await AuthService.verifyPassword(currentPassword, rows[0].password);
+      if (!valid) {
+        return res.status(401).json({ message: 'Password saat ini tidak sesuai.' });
+      }
+      const hashed = await AuthService.hashPassword(newPassword);
+      await prisma.$executeRaw`UPDATE "User" SET password = ${hashed}, "updatedAt" = NOW() WHERE id = ${req.user!.userId}`;
+      logger.info('AUTH', `Password changed for user ${req.user!.userId}`);
+      return res.json({ success: true, message: 'Password berhasil diubah.' });
+    } catch (err: any) {
+      logger.info('AUTH', `change-password error: ${err.message}`);
+      return res.status(500).json({ message: 'Terjadi kesalahan sistem. Coba lagi.' });
+    }
+  });
+
   // ── OTP / Forgot Password Routes ─────────────────────────────────
 
   // POST /api/auth/forgot-password — request OTP

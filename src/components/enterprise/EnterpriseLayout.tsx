@@ -13,6 +13,7 @@ import {
 import DemoBanner from '@/components/DemoBanner';
 import { useTheme } from '@/lib/ThemeContext';
 import { C } from '@/lib/themeC';
+import ChangePasswordModal from '@/components/ChangePasswordModal';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 export type EnterpriseModule =
@@ -316,7 +317,7 @@ const NotifPanel = ({ onClose }: { onClose: () => void }) => {
 };
 
 // ── Profile Dropdown ──────────────────────────────────────────────────────────
-const ProfileDropdown = ({ user, onLogout, onClose }: { user: any; onLogout: () => void; onClose: () => void }) => (
+const ProfileDropdown = ({ user, onLogout, onClose, onChangePassword }: { user: any; onLogout: () => void; onClose: () => void; onChangePassword: () => void }) => (
   <motion.div
     initial={{ opacity: 0, y: 8, scale: 0.97 }}
     animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -338,12 +339,17 @@ const ProfileDropdown = ({ user, onLogout, onClose }: { user: any; onLogout: () 
     </div>
     <div className="py-1">
       {[
-        { icon: User, label: 'Profil Saya' },
-        { icon: Settings, label: 'Pengaturan' },
-        { icon: Key, label: 'Ubah Password' },
+        { icon: User, label: 'Profil Saya', action: undefined as (() => void) | undefined },
+        { icon: Settings, label: 'Pengaturan', action: undefined as (() => void) | undefined },
+        { icon: Key, label: 'Ubah Password', action: () => { onClose(); onChangePassword(); } },
       ].map(item => (
-        <button key={item.label} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-gray-50 transition-colors text-left" style={{ color: C.textSub }}>
-          <item.icon size={14} style={{ color: C.textMuted }} />
+        <button
+          key={item.label}
+          onClick={item.action}
+          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-gray-50 transition-colors text-left"
+          style={{ color: C.textSub }}
+        >
+          <item.icon size={14} style={{ color: item.label === 'Ubah Password' ? '#FF6A00' : C.textMuted }} />
           {item.label}
         </button>
       ))}
@@ -388,6 +394,7 @@ export default function EnterpriseLayout({ user, authToken, onLogout, onSwitchMo
   const [search, setSearch] = useState('');
   const [showNotif, setShowNotif] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
   const [time, setTime] = useState(new Date());
   const notifRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
@@ -620,7 +627,7 @@ export default function EnterpriseLayout({ user, authToken, onLogout, onSwitchMo
               <ChevronDown size={12} style={{ color: C.textMuted }} />
             </button>
             <AnimatePresence>
-              {showProfile && <ProfileDropdown user={user} onLogout={onLogout} onClose={() => setShowProfile(false)} />}
+              {showProfile && <ProfileDropdown user={user} onLogout={onLogout} onClose={() => setShowProfile(false)} onChangePassword={() => setShowChangePassword(true)} />}
             </AnimatePresence>
           </div>
         </header>
@@ -641,6 +648,16 @@ export default function EnterpriseLayout({ user, authToken, onLogout, onSwitchMo
           </AnimatePresence>
         </main>
       </div>
+
+      {/* Change Password Modal */}
+      <AnimatePresence>
+        {showChangePassword && (
+          <ChangePasswordModal
+            authToken={authToken}
+            onClose={() => setShowChangePassword(false)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

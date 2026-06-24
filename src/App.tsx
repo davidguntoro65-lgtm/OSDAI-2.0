@@ -515,7 +515,7 @@ export default function App() {
               {activeTab === 'presensi' && renderPresensi()}
               {activeTab === 'jadwal' && <JadwalScreen authToken={token!} role={role} />}
               {activeTab === 'laporan' && <LaporanScreen authToken={token!} role={role} />}
-              {activeTab === 'akun' && <AkunScreen user={user} onLogout={handleLogout} />}
+              {activeTab === 'akun' && <AkunScreen user={user} authToken={token!} onLogout={handleLogout} />}
             </motion.div>
           </AnimatePresence>
         </div>
