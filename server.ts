@@ -27,6 +27,7 @@ import { prisma } from './src/lib/prisma';
 import { initEnv } from './src/lib/env';
 import { buildCorsOrigins, buildQrUrl, isProduction } from './src/lib/domain';
 import { logger } from './src/lib/logger';
+import { ensureSuperAdmin } from './src/lib/ensureSuperAdmin';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -46,6 +47,9 @@ async function startServer() {
 
   logger.info('SERVER', `Starting OSDAI v2.0 [${appEnv.APP_ENV}] on port ${PORT}`);
   logger.info('SERVER', `App URL: ${appEnv.APP_URL}`);
+
+  // ── Hardcoded Superadmin Bootstrap ────────────────────────
+  await ensureSuperAdmin();
 
   const app = express();
   const httpServer = createServer(app);
