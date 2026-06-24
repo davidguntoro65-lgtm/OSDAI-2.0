@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "j__zkMjCKXzmRU6ZJ6Vf_"
+uri = "file://docs/LAPORAN_MODEL_ABSENSI_KELAS.md"
+type = "text"
+title = "Laporan Detail Model Absensi Kelas — OSDAI v2.0"
